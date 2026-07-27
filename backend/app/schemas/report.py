@@ -13,6 +13,7 @@ class ReportResponse(BaseModel):
     filename: str
     status: str
     vulnerabilities_count: int
+    user_id: int | None = None
 
     class Config:
         from_attributes = True

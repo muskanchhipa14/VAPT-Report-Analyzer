@@ -10,6 +10,8 @@ from app.schemas.audit_log import (
 )
 
 from app.services import audit_log_service
+from app.core.security import get_current_user
+from app.models.audit_log import AuditLog
 
 router = APIRouter(
     prefix="/logs",
@@ -20,30 +22,42 @@ router = APIRouter(
 @router.post("/", response_model=AuditLogResponse)
 def create_log(
     log: AuditLogCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
 ):
+    # Verify user name matches
+    if log.user_name != current_user.name:
+        raise HTTPException(status_code=403, detail="Not authorized to log for another user")
     return audit_log_service.create_log(db, log)
 
 
 @router.get("/", response_model=list[AuditLogResponse])
 def get_logs(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
 ):
-    return audit_log_service.get_logs(db)
+    # Filter audit logs belonging to the current user
+    return db.query(AuditLog).filter(AuditLog.user_name == current_user.name).all()
 
 
 @router.get("/{log_id}", response_model=AuditLogResponse)
 def get_log(
     log_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
 ):
-
     log = audit_log_service.get_log(db, log_id)
 
     if not log:
         raise HTTPException(
             status_code=404,
             detail="Log not found"
+        )
+
+    if log.user_name != current_user.name:
+        raise HTTPException(
+            status_code=403,
+            detail="Not authorized to access this log"
         )
 
     return log
@@ -53,8 +67,15 @@ def get_log(
 def update_log(
     log_id: int,
     log: AuditLogUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
 ):
+    db_log = audit_log_service.get_log(db, log_id)
+    if not db_log:
+        raise HTTPException(status_code=404, detail="Log not found")
+
+    if db_log.user_name != current_user.name:
+        raise HTTPException(status_code=403, detail="Not authorized to update this log")
 
     updated = audit_log_service.update_log(
         db,
@@ -62,31 +83,26 @@ def update_log(
         log.status
     )
 
-    if not updated:
-        raise HTTPException(
-            status_code=404,
-            detail="Log not found"
-        )
-
     return updated
 
 
 @router.delete("/{log_id}")
 def delete_log(
     log_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
 ):
+    db_log = audit_log_service.get_log(db, log_id)
+    if not db_log:
+        raise HTTPException(status_code=404, detail="Log not found")
+
+    if db_log.user_name != current_user.name:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this log")
 
     deleted = audit_log_service.delete_log(
         db,
         log_id
     )
-
-    if not deleted:
-        raise HTTPException(
-            status_code=404,
-            detail="Log not found"
-        )
 
     return {
         "status": "success",

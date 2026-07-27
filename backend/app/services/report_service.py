@@ -2,8 +2,8 @@ from sqlalchemy.orm import Session
 from app.models.report import Report
 
 
-def create_report(db: Session, filename: str):
-    report = Report(filename=filename)
+def create_report(db: Session, filename: str, user_id: int = None):
+    report = Report(filename=filename, user_id=user_id)
     db.add(report)
     db.commit()
     db.refresh(report)
@@ -12,6 +12,10 @@ def create_report(db: Session, filename: str):
 
 def get_reports(db: Session):
     return db.query(Report).all()
+
+
+def get_reports_by_user(db: Session, user_id: int):
+    return db.query(Report).filter(Report.user_id == user_id).all()
 
 
 def get_report(db: Session, report_id: int):

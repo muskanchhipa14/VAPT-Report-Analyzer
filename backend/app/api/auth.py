@@ -9,6 +9,7 @@ from app.schemas.auth import (
 )
 from app.services import auth_service
 from app.services.audit_helper import log_event
+from app.core.security import create_access_token
 
 router = APIRouter(
     prefix="/auth",
@@ -50,8 +51,19 @@ def login(
         "Success"
     )
 
+    # Generate JWT access token
+    access_token = create_access_token(data={"sub": user.email, "role": user.role})
+
     return {
-        "message": "Login Successful"
+        "message": "Login Successful",
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "role": user.role
+        }
     }
 
 
@@ -90,8 +102,19 @@ def change_password(
         "Success"
     )
 
+    # Generate new JWT access token
+    access_token = create_access_token(data={"sub": user.email, "role": user.role})
+
     return {
-        "message": "Password Updated Successfully"
+        "message": "Password Updated Successfully",
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "role": user.role
+        }
     }
 
 

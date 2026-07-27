@@ -8,3 +8,4 @@ class Report(Base):
     filename = Column(String, nullable=False)
     status = Column(String, default="Uploaded")
     vulnerabilities_count = Column(Integer, default=0)
+    user_id = Column(Integer, index=True, nullable=True)
