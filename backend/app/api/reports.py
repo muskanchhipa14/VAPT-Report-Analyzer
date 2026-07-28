@@ -16,22 +16,22 @@ router = APIRouter(
 )
 
 
-@router.post("/", response_model=ReportResponse)
-def create_report(
-    report: ReportCreate,
-    db: Session = Depends(get_db)
-):
-    new_report = report_service.create_report(db, report.filename)
+# @router.post("/", response_model=ReportResponse)
+# def create_report(
+#     report: ReportCreate,
+#     db: Session = Depends(get_db)
+# ):
+#     new_report = report_service.create_report(db, report.filename)
 
-    log_event(
-        db,
-        "System",
-        "Create Report",
-        "Report Management",
-        "Success"
-    )
+#     log_event(
+#         db,
+#         "System",
+#         "Create Report",
+#         "Report Management",
+#         "Success"
+#     )
 
-    return new_report
+#     return new_report
 
 
 @router.get("/", response_model=list[ReportResponse])
