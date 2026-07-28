@@ -1,6 +1,8 @@
 from sqlalchemy.orm import Session
 from app.models.report import Report
-
+from fastapi import UploadFile
+import os
+import shutil
 
 def create_report(db: Session, filename: str):
     report = Report(filename=filename)
@@ -37,3 +39,30 @@ def delete_report(db: Session, report_id: int):
         db.commit()
 
     return report
+
+def upload_report(db: Session, file: UploadFile):
+
+    upload_dir = "uploads"
+
+    os.makedirs(upload_dir, exist_ok=True)
+
+    file_path = os.path.join(upload_dir, file.filename)
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    report = Report(
+        filename=file.filename,
+        status="Uploaded"
+    )
+
+    db.add(report)
+    db.commit()
+    db.refresh(report)
+
+    return {
+        "message": "Report uploaded successfully.",
+        "report_id": report.id,
+        "filename": report.filename,
+        "status": report.status
+    }
