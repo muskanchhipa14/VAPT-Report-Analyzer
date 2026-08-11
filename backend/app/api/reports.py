@@ -131,14 +131,45 @@ def delete_report(
     }
 
 @router.post("/upload")
-def upload_report(
+async def upload_report(
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
-    if not file.filename.endswith(".pdf"):
+    if not file.filename:
+        raise HTTPException(
+            status_code=400,
+            detail="No file provided."
+        )
+
+    if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(
             status_code=400,
             detail="Only PDF files are allowed."
         )
 
-    return report_service.upload_report(db, file)
+    try:
+        result = await report_service.upload_report(db, file)
+
+        log_event(
+            db,
+            "System",
+            "Upload Report",
+            "Report Management",
+            "Success"
+        )
+
+        return result
+
+    except Exception as e:
+        log_event(
+            db,
+            "System",
+            "Upload Report",
+            "Report Management",
+            "Failed"
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to process report: {str(e)}"
+        )

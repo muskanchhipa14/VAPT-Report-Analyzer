@@ -4,6 +4,8 @@ from fastapi import UploadFile
 import os
 import shutil
 
+from app.services.pdf_parser import extract_text_from_pdf
+
 def create_report(db: Session, filename: str):
     report = Report(filename=filename)
     db.add(report)
@@ -40,7 +42,7 @@ def delete_report(db: Session, report_id: int):
 
     return report
 
-def upload_report(db: Session, file: UploadFile):
+async def upload_report(db: Session, file: UploadFile):
 
     upload_dir = "uploads"
 
@@ -48,9 +50,30 @@ def upload_report(db: Session, file: UploadFile):
 
     file_path = os.path.join(upload_dir, file.filename)
 
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    # Save uploaded PDF
+    contents = await file.read()
 
+    if not contents:
+        raise ValueError("Uploaded PDF is empty.")
+
+    with open(file_path, "wb") as buffer:
+        buffer.write(contents)
+
+    # Extract text from PDF
+    try:
+        extracted_text = extract_text_from_pdf(file_path)
+    except Exception as e:
+        raise ValueError(
+            f"Failed to extract text from PDF: {str(e)}"
+        )
+
+    # Check whether text was extracted
+    if not extracted_text.strip():
+        raise ValueError(
+            "No readable text could be extracted from this PDF."
+        )
+
+    # Create report database record
     report = Report(
         filename=file.filename,
         status="Uploaded"
@@ -61,8 +84,10 @@ def upload_report(db: Session, file: UploadFile):
     db.refresh(report)
 
     return {
-        "message": "Report uploaded successfully.",
+        "message": "Report uploaded and parsed successfully.",
         "report_id": report.id,
         "filename": report.filename,
-        "status": report.status
+        "status": report.status,
+        "text_length": len(extracted_text),
+        "extracted_text": extracted_text
     }

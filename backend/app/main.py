@@ -37,6 +37,7 @@ app.include_router(auth.router)
 app.include_router(vulnerability.router)
 app.include_router(audit_log.router)
 app.include_router(knowledge_base.router)
+app.include_router(reports.router)
 
 
 @app.get("/")
