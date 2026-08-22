@@ -19,18 +19,18 @@ knowledge_base_entries = [
         "remediation": "Validate inputs, encode outputs, use Content Security Policy (CSP), and sanitize user-generated content."
     },
     {
-        "vulnerability_name": "Cross-Site Request Forgery (CSRF)",
-        "cwe_id": "CWE-352",
-        "severity": "Medium",
-        "description": "CSRF tricks authenticated users into performing unintended actions on a web application.",
-        "remediation": "Implement CSRF tokens, SameSite cookies, and verify the Origin or Referer headers."
+        "vulnerability_name": "Buffer Overflow",
+        "cwe_id": "CWE-120",
+        "severity": "Critical",
+        "description": "Buffer Overflow occurs when a program writes more data to a buffer than it can hold, leading to memory corruption or arbitrary code execution.",
+        "remediation": "Use safe library functions (e.g., strlcpy instead of strcpy), perform strict bounds checks, and use modern memory-safe languages."
     },
     {
-        "vulnerability_name": "Command Injection",
-        "cwe_id": "CWE-77",
-        "severity": "Critical",
-        "description": "Command Injection allows attackers to execute arbitrary operating system commands on the server.",
-        "remediation": "Avoid shell execution, validate inputs, and use safe APIs instead of system commands."
+        "vulnerability_name": "Hardcoded Credentials",
+        "cwe_id": "CWE-798",
+        "severity": "High",
+        "description": "Hardcoded Credentials refers to the practice of embedding passwords, keys, or tokens directly in source code.",
+        "remediation": "Use environment variables, secret vaults (like HashiCorp Vault), or configuration files stored securely outside the source tree."
     },
     {
         "vulnerability_name": "Path Traversal",
@@ -40,13 +40,6 @@ knowledge_base_entries = [
         "remediation": "Validate file paths, restrict file access, and use allowlists."
     },
     {
-        "vulnerability_name": "Broken Authentication",
-        "cwe_id": "CWE-287",
-        "severity": "Critical",
-        "description": "Improper authentication mechanisms allow attackers to compromise user accounts.",
-        "remediation": "Implement MFA, strong password policies, secure session management, and account lockout mechanisms."
-    },
-    {
         "vulnerability_name": "Insecure Direct Object Reference (IDOR)",
         "cwe_id": "CWE-639",
         "severity": "High",
@@ -54,29 +47,37 @@ knowledge_base_entries = [
         "remediation": "Perform server-side authorization checks for every request."
     },
     {
-        "vulnerability_name": "Security Misconfiguration",
-        "cwe_id": "CWE-16",
+        "vulnerability_name": "Missing Authentication",
+        "cwe_id": "CWE-306",
+        "severity": "Critical",
+        "description": "Missing Authentication for Critical Function occurs when the application does not verify the identity of the user before performing a sensitive function.",
+        "remediation": "Implement strict authentication checks for all administrative and user endpoints."
+    },
+    {
+        "vulnerability_name": "Weak Password Policy",
+        "cwe_id": "CWE-521",
         "severity": "Medium",
-        "description": "Default configurations, unnecessary services, and exposed error messages increase security risks.",
-        "remediation": "Harden systems, disable unnecessary services, and apply secure default configurations."
+        "description": "Weak Password Policy allows users to create easily guessable or simple passwords, exposing them to brute force attacks.",
+        "remediation": "Enforce password complexity rules, minimum length (e.g., 12 characters), and check passwords against lists of breached credentials."
     },
     {
-        "vulnerability_name": "Sensitive Data Exposure",
+        "vulnerability_name": "Information Exposure",
         "cwe_id": "CWE-200",
-        "severity": "High",
-        "description": "Sensitive information is exposed due to insufficient protection during storage or transmission.",
-        "remediation": "Encrypt sensitive data, use HTTPS, and avoid storing unnecessary confidential information."
+        "severity": "Medium",
+        "description": "Information Exposure allows attackers to gain insights about system internals, configuration, or user data from verbose logs or error messages.",
+        "remediation": "Disable detailed error messages in production, use generic error messages, and restrict log file access."
     },
     {
-        "vulnerability_name": "XML External Entity (XXE)",
-        "cwe_id": "CWE-611",
-        "severity": "High",
-        "description": "XXE allows attackers to exploit XML parsers to access local files or perform server-side request forgery.",
-        "remediation": "Disable external entity processing and use secure XML parser configurations."
+        "vulnerability_name": "Missing Security Headers",
+        "cwe_id": "CWE-693",
+        "severity": "Low",
+        "description": "Missing Security Headers (like HSTS, CSP, X-Frame-Options, or X-Content-Type-Options) exposes the application to attacks like clickjacking and content sniffing.",
+        "remediation": "Configure the web server (Nginx, Apache) or FastAPI middleware to include security headers on all responses."
     }
 ]
 
 added = 0
+updated = 0
 
 for item in knowledge_base_entries:
     existing = (
@@ -88,8 +89,14 @@ for item in knowledge_base_entries:
     if not existing:
         db.add(KnowledgeBase(**item))
         added += 1
+    else:
+        existing.vulnerability_name = item["vulnerability_name"]
+        existing.severity = item["severity"]
+        existing.description = item["description"]
+        existing.remediation = item["remediation"]
+        updated += 1
 
 db.commit()
 db.close()
 
-print(f"Knowledge Base seeded successfully! Added {added} new entries.")
+print(f"Knowledge Base seeded successfully! Added {added} and updated {updated} entries.")
