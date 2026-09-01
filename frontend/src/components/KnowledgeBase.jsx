@@ -118,7 +118,7 @@ const KnowledgeBase = () => {
                     <span>Secure Coding & Remediation Guidelines</span>
                   </h4>
                   <div className="bg-primary-500/5 border border-primary-500/10 rounded-2xl p-5 space-y-3">
-                    {selectedItem.recommendations.split('\n').map((rec, rIdx) => (
+                    {(selectedItem.remediation || selectedItem.recommendations || "No remediation guidelines available.").split('\n').map((rec, rIdx) => (
                       <div key={rIdx} className="flex gap-2.5 text-slate-300 text-sm leading-relaxed">
                         <span className="text-primary-400 shrink-0 font-bold">•</span>
                         <span>{rec.replace(/^\d+\.\s*/, '')}</span>

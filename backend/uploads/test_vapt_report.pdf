@@ -1,0 +1,56 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 915 >>
+stream
+BT /F1 12 Tf 50 750 Td 15 TL
+(Vulnerability Assessment and Penetration Testing Report) '
+(Target Application: CyberCorp Portal v1.2) '
+(Date: August 2026) '
+() '
+(Finding #1: SQL Injection \(CWE-89\)) '
+(Severity: High) '
+(Location: app/core/database.py line: 45) '
+(Description: SQL injection vulnerability in user login authentication.) '
+() '
+(Finding #2: Cross-Site Scripting \(XSS\) - CWE-79) '
+(Severity: High) '
+(Location: frontend/src/components/Dashboard.jsx:112) '
+(Description: Stored XSS vulnerability in user profile comments.) '
+() '
+(Finding #3: Hardcoded Credentials \(CWE-798\)) '
+(Severity: High) '
+(Location: config/jwt.json line 5) '
+(Description: JWT secret key hardcoded in source repository.) '
+() '
+(Finding #4: Missing Authentication \(CWE-306\)) '
+(Severity: Critical) '
+(Location: app/api/admin.py line 20) '
+(Description: Admin dashboard endpoints accessible without authorization.) '
+ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000266 00000 n 
+0000000340 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+450
+%%EOF

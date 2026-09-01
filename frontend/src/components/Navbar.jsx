@@ -16,7 +16,6 @@ const Navbar = ({ user, onLogout }) => {
     { name: 'Dashboard', path: '/', icon: <LayoutDashboard size={18} /> },
     { name: 'Vulnerabilities', path: '/vulnerabilities', icon: <AlertTriangle size={18} /> },
     { name: 'Knowledge Base', path: '/knowledge-base', icon: <BookOpen size={18} /> },
-    { name: 'Audit Logs', path: '/logs', icon: <ClipboardList size={18} /> },
   ];
 
   return (

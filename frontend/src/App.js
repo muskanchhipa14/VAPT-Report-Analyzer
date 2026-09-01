@@ -77,7 +77,7 @@ function App() {
                       <Route path="/" element={<Dashboard />} />
                       <Route path="/vulnerabilities" element={<VulnerabilityList />} />
                       <Route path="/knowledge-base" element={<KnowledgeBase />} />
-                      <Route path="/logs" element={<AuditLogs />} />
+                      <Route path="/logs" element={<Navigate to="/" replace />} />
                       <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
                   </main>

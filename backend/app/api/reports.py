@@ -69,16 +69,29 @@ def upload_report(
     
     try:
         if ext == ".pdf":
-            parsed_vulns = parse_vapt_pdf(file_path, filename)
+            parsed_vulns = parse_vapt_pdf(file_path, filename, db=db)
         else:
-            parsed_vulns = parse_vapt_docx(file_path, filename)
+            parsed_vulns = parse_vapt_docx(file_path, filename, db=db)
         
-        # 3. Save vulnerabilities to DB
+        # 3. Save vulnerabilities to DB and attach KB details
+        saved_vulns = []
         for vuln in parsed_vulns:
-            vulnerability_service.create_vulnerability(db, vuln)
+            v_obj = vulnerability_service.create_vulnerability(db, vuln)
+            saved_vulns.append({
+                "id": v_obj.id,
+                "report_name": v_obj.report_name,
+                "vulnerability_name": v_obj.vulnerability_name,
+                "severity": v_obj.severity,
+                "cwe_id": v_obj.cwe_id,
+                "file_name": v_obj.file_name,
+                "line_number": v_obj.line_number,
+                "status": v_obj.status,
+                "description": getattr(v_obj, "description", "N/A"),
+                "remediation": getattr(v_obj, "remediation", "N/A")
+            })
             
         # 4. Update Report record status and vulnerabilities count
-        db_report.vulnerabilities_count = len(parsed_vulns)
+        db_report.vulnerabilities_count = len(saved_vulns)
         db_report.status = "Completed"
         db.commit()
         db.refresh(db_report)
@@ -94,8 +107,11 @@ def upload_report(
         return {
             "message": "Report uploaded and parsed successfully",
             "report_id": db_report.id,
-            "vulnerabilities_found": len(parsed_vulns),
-            "status": "Completed"
+            "filename": db_report.filename,
+            "status": "Completed",
+            "vulnerabilities_count": len(saved_vulns),
+            "vulnerabilities_found": len(saved_vulns),
+            "detected_vulnerabilities": saved_vulns
         }
         
     except Exception as e:

@@ -311,15 +311,15 @@ const Dashboard = () => {
                         </td>
                         <td className="px-6 py-4">
                           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
-                            report.status === 'Completed' ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
-                            report.status === 'Parsing' ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' :
+                            ['Completed', 'Analyzed'].includes(report.status) ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
+                            ['Parsing', 'Processing'].includes(report.status) ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' :
                             'bg-red-500/10 text-red-400 border border-red-500/20'
                           }`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${
-                              report.status === 'Completed' ? 'bg-green-400' :
-                              report.status === 'Parsing' ? 'bg-yellow-400' :
+                              ['Completed', 'Analyzed'].includes(report.status) ? 'bg-green-400' :
+                              ['Parsing', 'Processing'].includes(report.status) ? 'bg-yellow-400' :
                               'bg-red-400'
-                            } ${report.status === 'Parsing' ? 'animate-ping' : ''}`}></span>
+                            } ${['Parsing', 'Processing'].includes(report.status) ? 'animate-ping' : ''}`}></span>
                             <span>{report.status}</span>
                           </span>
                         </td>
@@ -330,7 +330,7 @@ const Dashboard = () => {
                           <div className="inline-flex gap-2">
                             <button
                               onClick={() => navigate(`/vulnerabilities?report=${encodeURIComponent(report.filename)}`)}
-                              disabled={report.status !== 'Completed'}
+                              disabled={!['Completed', 'Analyzed'].includes(report.status)}
                               className="p-2 text-slate-400 hover:text-primary-400 hover:bg-slate-800 rounded-lg transition-all"
                               title="View Findings"
                             >
@@ -339,7 +339,7 @@ const Dashboard = () => {
                             <a
                               href={`http://localhost:8000/reports/${report.id}/download`}
                               className={`p-2 text-slate-400 hover:text-green-400 hover:bg-slate-800 rounded-lg transition-all ${
-                                report.status !== 'Completed' ? 'pointer-events-none opacity-40' : ''
+                                !['Completed', 'Analyzed'].includes(report.status) ? 'pointer-events-none opacity-40' : ''
                               }`}
                               title="Download PDF Report"
                               download
