@@ -86,10 +86,49 @@ def extract_text_from_pdf(file_path: str) -> str:
         print(f"Error reading PDF: {e}")
         return ""
 
+def get_vulnerability_identity(v) -> tuple:
+    """
+    Extracts a stable identity tuple for deduplicating vulnerabilities:
+    (normalized_name, normalized_cwe, normalized_file_name, line_number)
+    Preserves distinct findings occurring at different files or line numbers.
+    """
+    vuln_name = getattr(v, "vulnerability_name", "") or ""
+    cwe_id = getattr(v, "cwe_id", "") or ""
+    file_name = getattr(v, "file_name", "") or "N/A"
+    line_number = getattr(v, "line_number", 1) or 1
+
+    norm_name = vuln_name.strip().lower()
+    norm_cwe = cwe_id.strip().upper()
+    norm_file = file_name.strip().lower()
+    try:
+        norm_line = int(line_number)
+    except (ValueError, TypeError):
+        norm_line = 1
+
+    return (norm_name, norm_cwe, norm_file, norm_line)
+
+
+def deduplicate_vulnerabilities(vulns: list) -> list:
+    """
+    Deduplicates vulnerability records using their stable identity.
+    Preserves original order and does NOT remove distinct findings
+    located at different files or line numbers.
+    """
+    seen = set()
+    unique_vulns = []
+    for v in vulns:
+        key = get_vulnerability_identity(v)
+        if key not in seen:
+            seen.add(key)
+            unique_vulns.append(v)
+    return unique_vulns
+
+
 def parse_pdf_report(db: Session, file_path: str, report_name: str) -> list[Vulnerability]:
     """
     Parses a PDF report page by page. Uses a fallback system where CWE IDs are matched first,
     falling back to keywords only when CWE IDs are absent. Finds the closest filename and line number.
+    Ensures findings are deduplicated by (vulnerability_name, CWE, file_name, line_number).
     """
     if not os.path.exists(file_path):
         return []
@@ -101,7 +140,7 @@ def parse_pdf_report(db: Session, file_path: str, report_name: str) -> list[Vuln
         return []
         
     detected_vulns = []
-    seen_vulns = set()  # Track uniqueness by (cwe_id, file_name, line_number)
+    seen_vulns = set()  # Track uniqueness by stable identity
 
     file_regex = r"\b([a-zA-Z0-9_\-\/\\.]+\.(?:py|js|jsx|ts|tsx|java|c|cpp|h|go|rb|php|html|cs|sh|json|xml|yaml|yml))\b"
     line_regex = r"(?i)(?:line|ln|L)\s*:?\s*(\d+)"
@@ -158,19 +197,19 @@ def parse_pdf_report(db: Session, file_path: str, report_name: str) -> list[Vuln
                     if line_matches[0][1] < 400:
                         line_number = line_matches[0][0]
                         
-                vuln_key = (rule["cwe_id"], file_name, line_number)
+                # Resolve severity and name from Knowledge Base if present
+                kb_entry = db.query(KnowledgeBase).filter(KnowledgeBase.cwe_id == rule["cwe_id"]).first()
+                if not kb_entry:
+                    kb_entry = db.query(KnowledgeBase).filter(
+                        KnowledgeBase.vulnerability_name.ilike(rule["name"])
+                    ).first()
+                    
+                severity = kb_entry.severity if kb_entry else rule["severity"]
+                vuln_name = kb_entry.vulnerability_name if kb_entry else rule["name"]
+
+                vuln_key = (vuln_name.strip().lower(), rule["cwe_id"].strip().upper(), file_name.strip().lower(), line_number)
                 if vuln_key not in seen_vulns:
                     seen_vulns.add(vuln_key)
-                    
-                    # Resolve severity and name from Knowledge Base if present
-                    kb_entry = db.query(KnowledgeBase).filter(KnowledgeBase.cwe_id == rule["cwe_id"]).first()
-                    if not kb_entry:
-                        kb_entry = db.query(KnowledgeBase).filter(
-                            KnowledgeBase.vulnerability_name.ilike(rule["name"])
-                        ).first()
-                        
-                    severity = kb_entry.severity if kb_entry else rule["severity"]
-                    vuln_name = kb_entry.vulnerability_name if kb_entry else rule["name"]
                     
                     vuln = Vulnerability(
                         report_name=report_name,
@@ -189,4 +228,5 @@ def parse_pdf_report(db: Session, file_path: str, report_name: str) -> list[Vuln
         for v in detected_vulns:
             db.refresh(v)
             
-    return detected_vulns
+    return deduplicate_vulnerabilities(detected_vulns)
+

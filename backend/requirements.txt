@@ -1,2 +1,12 @@
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+pydantic-settings
+python-dotenv
+python-multipart
 pypdf==6.13.2
 reportlab==5.0.1
+google-genai
+pytest
+httpx

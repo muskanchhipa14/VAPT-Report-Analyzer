@@ -37,4 +37,11 @@ export const createKnowledgeBase = (data) => api.post('/knowledge-base/', data);
 export const updateKnowledgeBase = (id, data) => api.put(`/knowledge-base/${id}`, data);
 export const deleteKnowledgeBase = (id) => api.delete(`/knowledge-base/${id}`);
 
+// Gemini Independent Evaluation API
+export const getEvaluationStatus = () => api.get('/evaluation/status');
+export const evaluateReportFile = (formData) => api.post('/evaluate-report', formData, {
+  headers: { 'Content-Type': 'multipart/form-data' },
+});
+export const evaluateReportById = (reportId) => api.post(`/reports/${reportId}/evaluate`);
+
 export default api;

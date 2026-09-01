@@ -1,2 +1,25 @@
-frontend/node_modules/ 
-node_modules/ 
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Environment
+.env
+.env.*
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Frontend build
+frontend/build/
+
+# Uploaded files
+backend/uploads/
+
+# IDE
+.vscode/
+.idea/
+
+node_modules/
