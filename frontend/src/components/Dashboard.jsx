@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { reportAPI, vulnerabilityAPI } from '../services/api';
 import {
   Upload, FileText, Trash2, Download, ExternalLink,
-  ShieldCheck, AlertTriangle, FileUp, Loader, CheckCircle, RefreshCw
+  ShieldCheck, AlertTriangle, FileUp, Loader, CheckCircle, RefreshCw, FolderGit2
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 
@@ -15,6 +15,7 @@ const Dashboard = () => {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadError, setUploadError] = useState('');
+  const [downloadingReportId, setDownloadingReportId] = useState(null);
   const navigate = useNavigate();
 
   const fetchData = async () => {
@@ -74,6 +75,20 @@ const Dashboard = () => {
       } catch (err) {
         alert("Failed to delete report.");
       }
+    }
+  };
+
+  const handleDownloadReport = async (report) => {
+    if (!report) return;
+    setDownloadingReportId(report.id);
+    try {
+      const cleanName = report.filename.replace(/\.[^/.]+$/, "");
+      await reportAPI.downloadReport(report.id, `VAPT_Analysis_Report_${cleanName}.pdf`);
+    } catch (err) {
+      console.error("Failed to download PDF report", err);
+      alert(err.response?.data?.detail || "Failed to download PDF report.");
+    } finally {
+      setDownloadingReportId(null);
     }
   };
 
@@ -138,6 +153,14 @@ const Dashboard = () => {
             title="Refresh Dashboard"
           >
             <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+          </button>
+          <button
+            onClick={() => navigate('/source-code')}
+            className="flex items-center gap-2 bg-slate-900 border border-slate-700 hover:border-primary-500/50 hover:bg-slate-800 text-slate-200 font-semibold px-4 py-3 rounded-xl transition-all shadow-lg active:scale-[0.98]"
+            title="Switch to Source Code Security Scanner"
+          >
+            <FolderGit2 size={18} className="text-primary-400" />
+            <span>Source Code Scanner</span>
           </button>
           <button
             onClick={() => setShowUploadModal(true)}
@@ -336,16 +359,16 @@ const Dashboard = () => {
                             >
                               <ExternalLink size={16} />
                             </button>
-                            <a
-                              href={`http://localhost:8000/reports/${report.id}/download`}
+                            <button
+                              onClick={() => handleDownloadReport(report)}
+                              disabled={!['Completed', 'Analyzed'].includes(report.status) || downloadingReportId === report.id}
                               className={`p-2 text-slate-400 hover:text-green-400 hover:bg-slate-800 rounded-lg transition-all ${
                                 !['Completed', 'Analyzed'].includes(report.status) ? 'pointer-events-none opacity-40' : ''
                               }`}
                               title="Download PDF Report"
-                              download
                             >
-                              <Download size={16} />
-                            </a>
+                              <Download size={16} className={downloadingReportId === report.id ? 'animate-bounce text-green-400' : ''} />
+                            </button>
                             <button
                               onClick={() => handleDeleteReport(report.id)}
                               className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-all"

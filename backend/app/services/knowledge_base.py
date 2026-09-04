@@ -400,6 +400,16 @@ def seed_knowledge_base(db: Session):
             "description": "Using standard pseudo-random number generators (like Python random or C rand) for tokens or passwords generates predictable values.",
             "remediation": "Use cryptographically secure pseudo-random number generators (CSPRNGs, e.g. Python secrets or os.urandom).",
             "recommendations": "1. Use secrets module or crypto.getRandomValues for token generation.\n2. Never use standard pseudo-random functions for security tokens.\n3. Ensure sufficient entropy for secret generation."
+        },
+        {
+            "cwe_id": "CWE-489",
+            "vulnerability_name": "Active Debug Code / Debug Configuration",
+            "severity": "Medium",
+            "owasp_category": "A05:2021-Security Misconfiguration",
+            "capec_id": "CAPEC-13",
+            "description": "Leaving active debug code or enabling debug flags (e.g., debug=True) in production exposes internal application state, stack traces, and interactive execution consoles to attackers.",
+            "remediation": "Disable all debug modes, diagnostic flags, and testing endpoints before deploying code to production environments.",
+            "recommendations": "1. Set debug=False in production web framework configurations.\n2. Use environment variables (e.g., FLASK_ENV=production) to control diagnostic modes.\n3. Implement centralized, non-verbose logging instead of exposing live debug consoles."
         }
     ]
 

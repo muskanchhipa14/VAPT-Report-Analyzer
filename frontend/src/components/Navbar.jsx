@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { authAPI } from '../services/api';
-import { Shield, LayoutDashboard, AlertTriangle, BookOpen, ClipboardList, LogOut, User } from 'lucide-react';
+import { Shield, LayoutDashboard, AlertTriangle, BookOpen, LogOut, User, Code2 } from 'lucide-react';
 
 const Navbar = ({ user, onLogout }) => {
   const navigate = useNavigate();
@@ -14,6 +14,7 @@ const Navbar = ({ user, onLogout }) => {
 
   const navItems = [
     { name: 'Dashboard', path: '/', icon: <LayoutDashboard size={18} /> },
+    { name: 'Source Code Scanner', path: '/source-code', icon: <Code2 size={18} /> },
     { name: 'Vulnerabilities', path: '/vulnerabilities', icon: <AlertTriangle size={18} /> },
     { name: 'Knowledge Base', path: '/knowledge-base', icon: <BookOpen size={18} /> },
   ];

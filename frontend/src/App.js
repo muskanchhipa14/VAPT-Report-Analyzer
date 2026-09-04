@@ -6,6 +6,7 @@ import VulnerabilityList from './components/VulnerabilityList';
 import KnowledgeBase from './components/KnowledgeBase';
 import AuditLogs from './components/AuditLogs';
 import Login from './components/Login';
+import SourceCodeScanner from './components/SourceCodeScanner';
 
 // Private Route Wrapper Component
 const PrivateRoute = ({ children, user }) => {
@@ -75,9 +76,10 @@ function App() {
                   <main className="flex-1 bg-dark-950">
                     <Routes>
                       <Route path="/" element={<Dashboard />} />
+                      <Route path="/source-code" element={<SourceCodeScanner />} />
                       <Route path="/vulnerabilities" element={<VulnerabilityList />} />
                       <Route path="/knowledge-base" element={<KnowledgeBase />} />
-                      <Route path="/logs" element={<Navigate to="/" replace />} />
+                      <Route path="/logs" element={<AuditLogs />} />
                       <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
                   </main>

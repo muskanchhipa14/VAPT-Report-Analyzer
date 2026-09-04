@@ -85,6 +85,21 @@ export const reportAPI = {
     const response = await api.delete(`/reports/${id}`);
     return response.data;
   },
+  downloadReport: async (id, filename) => {
+    const response = await api.get(`/reports/${id}/download`, {
+      responseType: 'blob',
+    });
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename || `VAPT_Analysis_Report_${id}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+    return true;
+  },
   getDownloadUrl: (id) => {
     const token = localStorage.getItem('token');
     return `${API_BASE_URL}/reports/${id}/download?token=${token}`;
@@ -128,4 +143,48 @@ export const auditAPI = {
   }
 };
 
+export const sourceCodeAPI = {
+  getAnalyses: async () => {
+    const response = await api.get('/source-code/analyses');
+    return response.data;
+  },
+  getAnalysis: async (id) => {
+    const response = await api.get(`/source-code/analyses/${id}`);
+    return response.data;
+  },
+  uploadAndScan: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post('/source-code/analyze', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+  deleteAnalysis: async (id) => {
+    const response = await api.delete(`/source-code/analyses/${id}`);
+    return response.data;
+  },
+  downloadReport: async (id, filename) => {
+    const response = await api.get(`/source-code/analyses/${id}/download`, {
+      responseType: 'blob',
+    });
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename || `SAST_Security_Report_${id}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+    return true;
+  },
+  getDownloadUrl: (id) => {
+    return `${API_BASE_URL}/source-code/analyses/${id}/download`;
+  }
+};
+
 export default api;
+
