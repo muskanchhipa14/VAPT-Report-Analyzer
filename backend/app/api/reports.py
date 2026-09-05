@@ -9,7 +9,7 @@ from app.schemas.report import (
     ReportResponse
 )
 from app.services import report_service, vulnerability_service
-from app.services.pdf_parser import parse_vapt_pdf, parse_vapt_docx
+from app.services.pdf_parser import parse_vapt_pdf, parse_vapt_docx, parse_vapt_image
 from app.services.report_generator import generate_vapt_pdf_report
 from app.services.audit_helper import log_event
 from app.core.security import get_current_user
@@ -22,6 +22,9 @@ router = APIRouter(
 # Directory to store uploaded PDFs
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".tiff", ".svg"]
+ALLOWED_EXTENSIONS = [".pdf", ".docx"] + IMAGE_EXTENSIONS
 
 
 @router.post("/", response_model=ReportResponse)
@@ -50,8 +53,11 @@ def upload_report(
     current_user = Depends(get_current_user)
 ):
     ext = os.path.splitext(file.filename.lower())[1]
-    if ext not in [".pdf", ".docx"]:
-        raise HTTPException(status_code=400, detail="Only PDF and DOCX files are supported.")
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail="Only PDF, DOCX, and Image files (PNG, JPG, JPEG, WEBP, GIF, BMP, TIFF, SVG) are supported."
+        )
 
     filename = file.filename
     file_path = os.path.join(UPLOAD_DIR, filename)
@@ -70,8 +76,11 @@ def upload_report(
     try:
         if ext == ".pdf":
             parsed_vulns = parse_vapt_pdf(file_path, filename, db=db)
-        else:
+        elif ext == ".docx":
             parsed_vulns = parse_vapt_docx(file_path, filename, db=db)
+        else:
+            parsed_vulns = parse_vapt_image(file_path, filename, db=db)
+
         
         # 3. Save vulnerabilities to DB and attach KB details
         saved_vulns = []

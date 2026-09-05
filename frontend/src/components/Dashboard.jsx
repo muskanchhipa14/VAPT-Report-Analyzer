@@ -48,8 +48,10 @@ const Dashboard = () => {
       return;
     }
     const fileName = selectedFile.name.toLowerCase();
-    if (!fileName.endsWith('.pdf') && !fileName.endsWith('.docx')) {
-      setUploadError('Only PDF and DOCX files are allowed.');
+    const allowedExtensions = ['.pdf', '.docx', '.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.tiff', '.svg'];
+    const isAllowed = allowedExtensions.some(ext => fileName.endsWith(ext));
+    if (!isAllowed) {
+      setUploadError('Only PDF, DOCX, and Image files (PNG, JPG, JPEG, WEBP, GIF, BMP, TIFF, SVG) are allowed.');
       return;
     }
 
@@ -167,7 +169,7 @@ const Dashboard = () => {
             className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white font-semibold px-5 py-3 rounded-xl transition-all shadow-lg hover:shadow-primary-600/10 active:scale-[0.98]"
           >
             <Upload size={18} />
-            <span>Upload Scan PDF</span>
+            <span>Upload Vulnerability Report</span>
           </button>
         </div>
       </div>
@@ -402,7 +404,7 @@ const Dashboard = () => {
               <FileUp size={22} className="text-primary-500" />
               <span>Upload Vulnerability Report</span>
             </h3>
-            <p className="text-slate-400 text-sm mb-6">Select the VAPT security scan file (.pdf, .docx) to extract and map recommendations.</p>
+            <p className="text-slate-400 text-sm mb-6">Select the VAPT security scan document or screenshot (.pdf, .docx, image) to extract and map recommendations.</p>
             
             {uploadError && (
               <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
@@ -415,7 +417,7 @@ const Dashboard = () => {
                 <input
                   type="file"
                   required
-                  accept=".pdf,.docx"
+                  accept=".pdf,.docx,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tiff,.svg,image/*"
                   onChange={handleFileChange}
                   className="absolute inset-0 opacity-0 cursor-pointer"
                   disabled={uploading}
@@ -430,8 +432,8 @@ const Dashboard = () => {
                 ) : (
                   <>
                     <Upload className="text-slate-600 mb-3" size={32} />
-                    <span className="text-slate-300 text-sm font-semibold">Click to select PDF/DOCX or drag it here</span>
-                    <span className="text-slate-500 text-xs mt-1">Accepts standard PDF or DOCX scan logs</span>
+                    <span className="text-slate-300 text-sm font-semibold">Click to select PDF, DOCX, or Image file</span>
+                    <span className="text-slate-500 text-xs mt-1">Supports PDF, DOCX, PNG, JPG, JPEG, WEBP, and GIF</span>
                   </>
                 )}
               </div>
