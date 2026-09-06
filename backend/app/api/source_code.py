@@ -28,6 +28,12 @@ router = APIRouter(
 MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024
 
 
+SOURCE_EXTENSIONS = {
+    ".py", ".java", ".js", ".jsx", ".ts", ".tsx", ".c", ".cpp", ".cc", ".h", ".hpp",
+    ".php", ".cs", ".go", ".rb"
+}
+
+
 @router.post("/analyze", response_model=SourceCodeScanUploadResponse)
 async def analyze_source_code(
     file: UploadFile = File(...),
@@ -35,16 +41,17 @@ async def analyze_source_code(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Accepts project ZIP archive, safely unpacks it, performs AST / structural
-    vulnerability analysis, attaches remediation from Knowledge Base, and stores findings.
+    Accepts project ZIP archive or single source code file (.py, .java, .cpp, .c, .js, .ts, .php, .cs, .go),
+    performs AST / structural vulnerability analysis, attaches remediation from Knowledge Base & AI,
+    and stores findings.
     """
     filename = file.filename or "project.zip"
     ext = os.path.splitext(filename.lower())[1]
 
-    if ext != ".zip":
+    if ext != ".zip" and ext not in SOURCE_EXTENSIONS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only ZIP archive files (.zip) are supported for source code scanning."
+            detail="Supported file formats: .zip archives or source code files (.py, .java, .js, .ts, .c, .cpp, .php, .cs, .go, .rb)."
         )
 
     log_event(
@@ -55,28 +62,43 @@ async def analyze_source_code(
         "Started"
     )
 
-    # Save to a temporary file
+    # Save to a temporary file if zip
     temp_zip = os.path.join(tempfile.gettempdir(), f"upload_{uuid.uuid4().hex}.zip")
     total_size = 0
 
     try:
-        with open(temp_zip, "wb") as f:
-            while chunk := await file.read(1024 * 1024):  # 1MB chunks
-                total_size += len(chunk)
-                if total_size > MAX_UPLOAD_SIZE_BYTES:
-                    raise HTTPException(
-                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                        detail=f"Uploaded ZIP file exceeds maximum size limit ({MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)}MB)."
-                    )
-                f.write(chunk)
+        if ext == ".zip":
+            with open(temp_zip, "wb") as f:
+                while chunk := await file.read(1024 * 1024):  # 1MB chunks
+                    total_size += len(chunk)
+                    if total_size > MAX_UPLOAD_SIZE_BYTES:
+                        raise HTTPException(
+                            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                            detail=f"Uploaded ZIP file exceeds maximum size limit ({MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)}MB)."
+                        )
+                    f.write(chunk)
 
-        # Process and scan the archive
-        analysis, findings = source_code_service.process_zip_upload(
-            db=db,
-            zip_path=temp_zip,
-            filename=filename,
-            user_id=current_user.id
-        )
+            # Process and scan the archive
+            analysis, findings = source_code_service.process_zip_upload(
+                db=db,
+                zip_path=temp_zip,
+                filename=filename,
+                user_id=current_user.id
+            )
+        else:
+            raw_bytes = await file.read()
+            if len(raw_bytes) > MAX_UPLOAD_SIZE_BYTES:
+                raise HTTPException(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail=f"Uploaded file exceeds maximum size limit ({MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)}MB)."
+                )
+            content_str = raw_bytes.decode("utf-8", errors="replace")
+            analysis, findings = source_code_service.process_single_file_upload(
+                db=db,
+                filename=filename,
+                content=content_str,
+                user_id=current_user.id
+            )
 
         log_event(
             db,

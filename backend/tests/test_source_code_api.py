@@ -146,3 +146,29 @@ def test_upload_and_analyze_zip_and_download(auth_header, other_user_auth_header
     # 9. Verify download of deleted analysis returns 404
     post_del_dl = client.get(f"/source-code/analyses/{analysis_id}/download", headers=auth_header)
     assert post_del_dl.status_code == 404
+
+
+def test_upload_and_analyze_single_file(auth_header):
+    c_code = b"""
+    #include <stdio.h>
+    #include <string.h>
+    void test(char *input) {
+        char buf[32];
+        strcpy(buf, input);
+    }
+    """
+    res = client.post(
+        "/source-code/analyze",
+        headers=auth_header,
+        files={"file": ("vulnerable.c", c_code, "text/x-c")}
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert "analysis_id" in data
+    assert data["files_scanned"] == 1
+    assert data["vulnerabilities_found"] >= 1
+    # Check that findings include AI remediation
+    findings = data["findings"]
+    assert any(f["cwe_id"] == "CWE-120" for f in findings)
+    assert any(f.get("secure_code") is not None for f in findings)
+

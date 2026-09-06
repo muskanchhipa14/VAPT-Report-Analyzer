@@ -18,6 +18,13 @@ class ScanFinding:
     remediation: Optional[str] = None
     recommendation: Optional[str] = None
     owasp_category: Optional[str] = None
+    framework: Optional[str] = None
+    database_or_lib: Optional[str] = None
+    why_vulnerable: Optional[str] = None
+    ai_remediation: Optional[str] = None
+    secure_code: Optional[str] = None
+    implementation_steps: Optional[List[str]] = None
+    verification_steps: Optional[List[str]] = None
 
 
 @dataclass

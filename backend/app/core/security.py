@@ -58,3 +58,14 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     if user is None:
         raise credentials_exception
     return user
+
+def get_current_user_optional(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    if not token:
+        return None
+    payload = verify_access_token(token)
+    if payload is None:
+        return None
+    email: str = payload.get("sub")
+    if email is None:
+        return None
+    return user_service.get_user_by_email(db, email=email)

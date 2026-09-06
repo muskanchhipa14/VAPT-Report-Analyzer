@@ -186,5 +186,48 @@ export const sourceCodeAPI = {
   }
 };
 
+export const analysisAPI = {
+  analyzeReport: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post('/api/analyze/report', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+  analyzeSourceCode: async ({ file, codeContent, filename, language }) => {
+    const formData = new FormData();
+    if (file) {
+      formData.append('file', file);
+    }
+    if (codeContent) {
+      formData.append('code_content', codeContent);
+    }
+    if (filename) {
+      formData.append('filename', filename);
+    }
+    if (language) {
+      formData.append('language', language);
+    }
+    const response = await api.post('/api/analyze/source-code', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+  analyzeCombined: async (reportFile, sourceFile) => {
+    const formData = new FormData();
+    formData.append('report_file', reportFile);
+    formData.append('source_file', sourceFile);
+    const response = await api.post('/api/analyze/combined', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+  generateRemediation: async (payload) => {
+    const response = await api.post('/api/remediation/generate', payload);
+    return response.data;
+  }
+};
+
 export default api;
 

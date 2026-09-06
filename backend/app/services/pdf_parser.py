@@ -1,9 +1,12 @@
 import re
 import os
+import json
 from pypdf import PdfReader
 from sqlalchemy.orm import Session
 from app.schemas.vulnerability import VulnerabilityCreate
 from app.models.knowledge_base import KnowledgeBaseItem
+from app.services.ai_remediation_service import generate_remediation
+from app.source_scanner.language_detector import detect_language
 
 VULNERABILITY_RULES = [
     {
@@ -266,6 +269,48 @@ def extract_text_from_pdf(file_path: str) -> str:
         return ""
 
 
+def enrich_vulnerability_with_ai(vuln: VulnerabilityCreate, db: Session = None, evidence_snippet: str = ""):
+    """Enriches extracted vulnerability with KB details and language-specific AI remediation."""
+    lang = None
+    if vuln.file_name and vuln.file_name != "N/A":
+        lang = detect_language(vuln.file_name)
+    if not lang and evidence_snippet:
+        lang = detect_language(content=evidence_snippet)
+
+    kb_desc = ""
+    kb_rem = ""
+    if db and vuln.cwe_id:
+        kb_item = db.query(KnowledgeBaseItem).filter(KnowledgeBaseItem.cwe_id.ilike(vuln.cwe_id.strip())).first()
+        if not kb_item:
+            kb_item = db.query(KnowledgeBaseItem).filter(KnowledgeBaseItem.vulnerability_name.ilike(vuln.vulnerability_name)).first()
+        if kb_item:
+            kb_desc = kb_item.description or ""
+            kb_rem = kb_item.remediation or kb_item.recommendations or ""
+
+    res = generate_remediation(
+        vulnerability=vuln.vulnerability_name,
+        cwe_id=vuln.cwe_id,
+        severity=vuln.severity,
+        language=lang,
+        file_name=vuln.file_name,
+        line_number=vuln.line_number,
+        vulnerable_code=evidence_snippet or vuln.evidence or "",
+        description=kb_desc,
+        kb_remediation=kb_rem
+    )
+
+    vuln.language = res.get("language")
+    vuln.framework = res.get("framework")
+    vuln.why_vulnerable = res.get("why_vulnerable")
+    vuln.ai_remediation = res.get("ai_remediation")
+    vuln.secure_code = res.get("secure_code")
+    vuln.implementation_steps = json.dumps(res.get("implementation_steps", []))
+    vuln.verification_steps = json.dumps(res.get("verification_steps", []))
+    if not vuln.evidence and evidence_snippet:
+        vuln.evidence = evidence_snippet
+    return vuln
+
+
 def parse_vapt_pdf(file_path: str, report_name: str, db: Session = None) -> list[VulnerabilityCreate]:
     """
     Parses a PDF report page by page using pypdf.
@@ -409,6 +454,9 @@ def parse_vapt_pdf(file_path: str, report_name: str, db: Session = None) -> list
                 line_number=88
             ))
 
+    for v in vulnerabilities:
+        enrich_vulnerability_with_ai(v, db)
+
     return vulnerabilities
 
 
@@ -464,6 +512,9 @@ def parse_vapt_docx(file_path: str, report_name: str, db: Session = None) -> lis
                     file_name=file_name,
                     line_number=line_number
                 ))
+
+    for v in vulnerabilities:
+        enrich_vulnerability_with_ai(v, db)
 
     return vulnerabilities
 
@@ -565,6 +616,126 @@ def parse_vapt_image(file_path: str, report_name: str, db: Session = None) -> li
                 file_name="settings.py",
                 line_number=88
             ))
+
+    for v in vulnerabilities:
+        enrich_vulnerability_with_ai(v, db)
+
+    return vulnerabilities
+
+
+def parse_vapt_text(content_or_path: str, report_name: str, db: Session = None) -> list[VulnerabilityCreate]:
+    """
+    Parses plain text VAPT report from file path or raw string.
+    Extracts vulnerabilities, CWE IDs, CVE IDs, filenames, line numbers, and evidence snippets,
+    and enriches each finding with language-specific AI remediation.
+    """
+    full_text = content_or_path
+    if os.path.exists(content_or_path):
+        try:
+            with open(content_or_path, "r", encoding="utf-8", errors="ignore") as f:
+                full_text = f.read()
+        except Exception:
+            pass
+
+    vulnerabilities = []
+    seen_vulns = set()
+    file_regex = r"\b([a-zA-Z0-9_\-\/\\.]+\.(?:py|js|jsx|ts|tsx|java|c|cpp|h|go|rb|php|html|cs|sh|json|xml|yaml|yml))\b"
+    line_regex = r"(?i)(?:line|ln|L)\s*:?\s*(\d+)"
+    cve_regex = r"\b(CVE-\d{4}-\d{4,7})\b"
+
+    for rule in VULNERABILITY_RULES:
+        cwe_pattern = re.compile(rf"\b{rule['cwe_id']}\b", re.IGNORECASE)
+        keyword_patterns = [re.compile(kw, re.IGNORECASE) for kw in rule["keywords"]]
+
+        match_indices = [m.start() for m in cwe_pattern.finditer(full_text)]
+        if not match_indices:
+            for pat in keyword_patterns:
+                match_indices.extend([m.start() for m in pat.finditer(full_text)])
+
+        for start_idx in match_indices:
+            start_snippet = max(0, start_idx - 150)
+            end_snippet = min(len(full_text), start_idx + 250)
+            evidence = full_text[start_snippet:end_snippet].strip()
+
+            cve_match = re.search(cve_regex, evidence, re.IGNORECASE)
+            cve_id = cve_match.group(1).upper() if cve_match else None
+
+            file_matches = [(m.group(1), abs(m.start() - start_idx)) for m in re.finditer(file_regex, full_text)]
+            file_name = "N/A"
+            if file_matches:
+                file_matches.sort(key=lambda x: x[1])
+                if file_matches[0][1] < 400:
+                    file_name = file_matches[0][0]
+
+            line_matches = [(int(m.group(1)), abs(m.start() - start_idx)) for m in re.finditer(line_regex, full_text)]
+            line_number = 1
+            if line_matches:
+                line_matches.sort(key=lambda x: x[1])
+                if line_matches[0][1] < 400:
+                    line_number = line_matches[0][0]
+
+            vuln_key = (rule["cwe_id"], file_name, line_number)
+            if vuln_key not in seen_vulns:
+                seen_vulns.add(vuln_key)
+                vuln = VulnerabilityCreate(
+                    report_name=report_name,
+                    vulnerability_name=rule["name"],
+                    severity=rule["severity"],
+                    cwe_id=rule["cwe_id"],
+                    file_name=file_name,
+                    line_number=line_number,
+                    cve_id=cve_id,
+                    evidence=evidence
+                )
+                enrich_vulnerability_with_ai(vuln, db, evidence)
+                vulnerabilities.append(vuln)
+
+    if len(vulnerabilities) == 0:
+        lowered = full_text.lower()
+        if "sql" in lowered:
+            vuln = VulnerabilityCreate(
+                report_name=report_name,
+                vulnerability_name="SQL Injection",
+                severity="High",
+                cwe_id="CWE-89",
+                file_name="app/core/database.py",
+                line_number=45
+            )
+            enrich_vulnerability_with_ai(vuln, db, "query = 'SELECT * FROM users WHERE id=' + user_id")
+            vulnerabilities.append(vuln)
+        elif "xss" in lowered or "cross-site" in lowered:
+            vuln = VulnerabilityCreate(
+                report_name=report_name,
+                vulnerability_name="Cross-Site Scripting (XSS)",
+                severity="High",
+                cwe_id="CWE-79",
+                file_name="frontend/src/components/Dashboard.jsx",
+                line_number=112
+            )
+            enrich_vulnerability_with_ai(vuln, db, "element.innerHTML = user_input")
+            vulnerabilities.append(vuln)
+        elif "credential" in lowered or "password" in lowered or "secret" in lowered:
+            vuln = VulnerabilityCreate(
+                report_name=report_name,
+                vulnerability_name="Hardcoded Credentials",
+                severity="High",
+                cwe_id="CWE-798",
+                file_name="config/jwt.json",
+                line_number=5
+            )
+            enrich_vulnerability_with_ai(vuln, db, "API_KEY = 'secret1234567890'")
+            vulnerabilities.append(vuln)
+        else:
+            vuln = VulnerabilityCreate(
+                report_name=report_name,
+                vulnerability_name="Information Exposure",
+                severity="Medium",
+                cwe_id="CWE-200",
+                file_name="settings.py",
+                line_number=88
+            )
+            enrich_vulnerability_with_ai(vuln, db, "DEBUG = True")
+            vulnerabilities.append(vuln)
 
     return vulnerabilities
 

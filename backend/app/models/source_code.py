@@ -47,6 +47,12 @@ class SourceCodeFinding(Base):
     remediation = Column(Text, nullable=True)
     recommendation = Column(Text, nullable=True)
     owasp_category = Column(String, nullable=True)
+    framework = Column(String, nullable=True)
+    why_vulnerable = Column(Text, nullable=True)
+    ai_remediation = Column(Text, nullable=True)
+    secure_code = Column(Text, nullable=True)
+    implementation_steps = Column(Text, nullable=True)
+    verification_steps = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     analysis = relationship("SourceCodeAnalysis", back_populates="findings")

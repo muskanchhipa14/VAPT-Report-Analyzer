@@ -9,7 +9,7 @@ from app.schemas.report import (
     ReportResponse
 )
 from app.services import report_service, vulnerability_service
-from app.services.pdf_parser import parse_vapt_pdf, parse_vapt_docx, parse_vapt_image
+from app.services.pdf_parser import parse_vapt_pdf, parse_vapt_docx, parse_vapt_image, parse_vapt_text
 from app.services.report_generator import generate_vapt_pdf_report
 from app.services.audit_helper import log_event
 from app.core.security import get_current_user
@@ -24,7 +24,7 @@ UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.pat
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".tiff", ".svg"]
-ALLOWED_EXTENSIONS = [".pdf", ".docx"] + IMAGE_EXTENSIONS
+ALLOWED_EXTENSIONS = [".pdf", ".docx", ".txt"] + IMAGE_EXTENSIONS
 
 
 @router.post("/", response_model=ReportResponse)
@@ -78,6 +78,8 @@ def upload_report(
             parsed_vulns = parse_vapt_pdf(file_path, filename, db=db)
         elif ext == ".docx":
             parsed_vulns = parse_vapt_docx(file_path, filename, db=db)
+        elif ext == ".txt":
+            parsed_vulns = parse_vapt_text(file_path, filename, db=db)
         else:
             parsed_vulns = parse_vapt_image(file_path, filename, db=db)
 

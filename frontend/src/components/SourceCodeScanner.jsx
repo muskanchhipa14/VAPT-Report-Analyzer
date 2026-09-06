@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { sourceCodeAPI } from '../services/api';
+import RemediationInspector from './RemediationInspector';
 import {
   Upload, FileCode2, ShieldAlert, CheckCircle2,
   Trash2, Download, Search, Sparkles, Layers,
   Code2, RefreshCw, AlertTriangle,
-  FolderGit2, Terminal, Info, X, ChevronRight, Copy, Check
+  FolderGit2, Terminal, Info, X, ChevronRight, Copy, Check, Database
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 
@@ -13,6 +14,7 @@ const SourceCodeScanner = () => {
   const [selectedAnalysis, setSelectedAnalysis] = useState(null);
   const [analysisDetail, setAnalysisDetail] = useState(null);
   const [selectedFinding, setSelectedFinding] = useState(null);
+  const [inspectingFinding, setInspectingFinding] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -20,7 +22,7 @@ const SourceCodeScanner = () => {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadError, setUploadError] = useState('');
-  const [copiedFix, setCopiedFix] = useState(false);
+  const [copiedSecure, setCopiedSecure] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
   // Filters
@@ -72,11 +74,15 @@ const SourceCodeScanner = () => {
     fetchAnalysisDetail(analysis.id);
   };
 
+  const ALLOWED_EXTS = ['.zip', '.py', '.java', '.cpp', '.cc', '.c', '.h', '.hpp', '.js', '.ts', '.tsx', '.jsx', '.php', '.cs', '.go', '.rb'];
+
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (!file.name.toLowerCase().endsWith('.zip')) {
-        setUploadError('Only .zip archive packages are supported.');
+      const lower = file.name.toLowerCase();
+      const isAllowed = ALLOWED_EXTS.some(ext => lower.endsWith(ext));
+      if (!isAllowed) {
+        setUploadError('Supported file types: .zip project archives or source files (.py, .java, .cpp, .c, .js, .ts, .php, .cs, .go, .rb).');
         setSelectedFile(null);
         return;
       }
@@ -88,7 +94,7 @@ const SourceCodeScanner = () => {
   const handleUploadAndScan = async (e) => {
     e.preventDefault();
     if (!selectedFile) {
-      setUploadError('Please select a .zip project file.');
+      setUploadError('Please select a project ZIP or source file.');
       return;
     }
 
@@ -134,11 +140,25 @@ const SourceCodeScanner = () => {
     }
   };
 
-  const handleCopyFix = (codeText) => {
+  const handleCopySecure = (codeText) => {
     if (!codeText) return;
     navigator.clipboard.writeText(codeText);
-    setCopiedFix(true);
-    setTimeout(() => setCopiedFix(false), 2000);
+    setCopiedSecure(true);
+    setTimeout(() => setCopiedSecure(false), 2000);
+  };
+
+  const parseList = (val) => {
+    if (!val) return [];
+    if (Array.isArray(val)) return val;
+    if (typeof val === 'string') {
+      try {
+        const parsed = JSON.parse(val);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {
+        return val.split('\n').map(s => s.replace(/^\d+\.\s*/, '').trim()).filter(Boolean);
+      }
+    }
+    return [String(val)];
   };
 
   // Severity Colors
@@ -162,8 +182,13 @@ const SourceCodeScanner = () => {
   const getLanguageBadgeClass = (lang) => {
     const l = (lang || '').toLowerCase();
     if (l === 'python') return 'bg-blue-500/10 text-blue-400 border border-blue-500/20';
-    if (l === 'javascript') return 'bg-amber-500/10 text-amber-300 border border-amber-500/20';
+    if (l === 'javascript' || l === 'js') return 'bg-amber-500/10 text-amber-300 border border-amber-500/20';
+    if (l === 'typescript' || l === 'ts') return 'bg-sky-500/10 text-sky-300 border border-sky-500/20';
     if (l === 'java') return 'bg-red-500/10 text-red-300 border border-red-500/20';
+    if (l === 'c' || l === 'cpp' || l === 'c++') return 'bg-purple-500/10 text-purple-300 border border-purple-500/20';
+    if (l === 'php') return 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/20';
+    if (l === 'csharp' || l === 'c#') return 'bg-green-500/10 text-green-300 border border-green-500/20';
+    if (l === 'go' || l === 'golang') return 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/20';
     return 'bg-slate-800 text-slate-300 border border-slate-700';
   };
 
@@ -232,7 +257,7 @@ const SourceCodeScanner = () => {
             className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white font-semibold px-5 py-3 rounded-xl transition-all shadow-lg hover:shadow-primary-600/10 active:scale-[0.98]"
           >
             <FolderGit2 size={18} />
-            <span>Scan Project ZIP</span>
+            <span>Scan Code / Project ZIP</span>
           </button>
         </div>
       </div>
@@ -465,7 +490,12 @@ const SourceCodeScanner = () => {
                 <option value="">All Languages</option>
                 <option value="python">Python</option>
                 <option value="javascript">JavaScript / JSX</option>
+                <option value="typescript">TypeScript</option>
                 <option value="java">Java</option>
+                <option value="cpp">C / C++</option>
+                <option value="php">PHP</option>
+                <option value="csharp">C# (.NET)</option>
+                <option value="go">Go</option>
               </select>
             </div>
 
@@ -548,16 +578,29 @@ const SourceCodeScanner = () => {
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedFinding(f);
-                            }}
-                            className="p-1.5 text-slate-400 hover:text-primary-400 hover:bg-slate-800 rounded-lg transition-all"
-                            title="Inspect Code Context & Fix"
-                          >
-                            <ChevronRight size={18} />
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setInspectingFinding(f);
+                              }}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary-500/10 hover:bg-primary-500/20 text-primary-400 border border-primary-500/20 rounded-lg text-xs font-semibold transition-all"
+                              title="Open Full AI Remediation Inspector"
+                            >
+                              <Sparkles size={13} />
+                              <span>AI Fix</span>
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedFinding(f);
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-primary-400 hover:bg-slate-800 rounded-lg transition-all"
+                              title="Inspect Code Context & Fix"
+                            >
+                              <ChevronRight size={18} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -607,6 +650,15 @@ const SourceCodeScanner = () => {
 
             {/* Drawer Body Scroll */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Action Banner: Launch Full Diff Inspector */}
+              <button
+                onClick={() => setInspectingFinding(selectedFinding)}
+                className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-semibold transition-all shadow-lg hover:shadow-primary-600/10 active:scale-[0.99]"
+              >
+                <Sparkles size={16} />
+                <span>Open Full AI Remediation Inspector (Diff & Retesting)</span>
+              </button>
+
               {/* Badges strip */}
               <div className="flex flex-wrap gap-2">
                 <span className={`inline-flex px-3 py-1 rounded-xl text-xs font-bold ${getSeverityBadgeClass(selectedFinding.severity)}`}>
@@ -620,6 +672,18 @@ const SourceCodeScanner = () => {
                   <Terminal size={13} className="text-amber-400" />
                   <span>Language: {selectedFinding.language.toUpperCase()}</span>
                 </span>
+                {selectedFinding.framework && selectedFinding.framework !== 'Unknown' && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-cyan-500/10 border border-cyan-500/20 rounded-xl text-xs text-cyan-400 font-semibold">
+                    <Layers size={13} />
+                    <span>{selectedFinding.framework}</span>
+                  </span>
+                )}
+                {selectedFinding.database_or_lib && selectedFinding.database_or_lib !== 'Standard' && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-violet-500/10 border border-violet-500/20 rounded-xl text-xs text-violet-400 font-semibold">
+                    <Database size={13} />
+                    <span>{selectedFinding.database_or_lib}</span>
+                  </span>
+                )}
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-800/80 border border-slate-700 rounded-xl text-xs text-slate-300 font-semibold">
                   <Info size={13} className="text-cyan-400" />
                   <span>Confidence: {selectedFinding.confidence}</span>
@@ -664,19 +728,93 @@ const SourceCodeScanner = () => {
                 </div>
               )}
 
-              {/* Vulnerability Explanation (from KB) */}
+              {/* WHY IT IS VULNERABLE */}
               <div className="space-y-2">
-                <h4 className="text-slate-400 text-xs font-bold uppercase tracking-wider">Why this is vulnerable</h4>
-                <div className="p-4 bg-slate-900/40 border border-slate-800 rounded-xl text-slate-300 text-sm leading-relaxed">
-                  {selectedFinding.description || 'Vulnerability detected during static structural analysis.'}
+                <h4 className="text-slate-400 text-xs font-bold uppercase tracking-wider text-rose-400 flex items-center gap-1.5">
+                  <AlertTriangle size={14} />
+                  Why this is vulnerable
+                </h4>
+                <div className="p-4 bg-rose-500/5 border border-rose-500/15 rounded-xl text-slate-300 text-sm leading-relaxed">
+                  {selectedFinding.why_vulnerable || selectedFinding.description || 'Vulnerability detected during static structural analysis.'}
                 </div>
               </div>
 
-              {/* Remediation Guidelines (from KB) */}
+              {/* AI LANGUAGE-SPECIFIC REMEDIATION */}
               <div className="space-y-2">
+                <h4 className="text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 text-primary-400">
+                  <Sparkles size={14} />
+                  <span>AI Context-Aware Remediation ({selectedFinding.language.toUpperCase()})</span>
+                </h4>
+                <div className="bg-primary-500/5 border border-primary-500/10 rounded-xl p-4 text-slate-200 text-sm leading-relaxed">
+                  {selectedFinding.ai_remediation || selectedFinding.remediation || selectedFinding.recommendation || 'Validate all untrusted input parameters.'}
+                </div>
+              </div>
+
+              {/* REMEDIATED SECURE CODE */}
+              {(selectedFinding.secure_code || selectedFinding.suggested_fix) && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 text-emerald-400">
+                      <Code2 size={14} />
+                      <span>Remediated Secure Code ({selectedFinding.language.toUpperCase()})</span>
+                    </h4>
+                    <button
+                      onClick={() => handleCopySecure(selectedFinding.secure_code || selectedFinding.suggested_fix)}
+                      className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300 px-2.5 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 transition-colors"
+                    >
+                      {copiedSecure ? <Check size={12} className="text-emerald-300" /> : <Copy size={12} />}
+                      <span>{copiedSecure ? 'Copied' : 'Copy Code'}</span>
+                    </button>
+                  </div>
+
+                  <div className="bg-slate-950 border border-emerald-500/30 rounded-xl p-4 font-mono text-xs text-emerald-300 leading-relaxed overflow-x-auto shadow-inner">
+                    <pre>{selectedFinding.secure_code || selectedFinding.suggested_fix}</pre>
+                  </div>
+                  <p className="text-[11px] text-slate-500 italic">
+                    Note: Suggested implementations are defensive examples. Review context and test thoroughly before applying to production.
+                  </p>
+                </div>
+              )}
+
+              {/* IMPLEMENTATION STEPS */}
+              {parseList(selectedFinding.implementation_steps).length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Implementation Steps</h4>
+                  <div className="space-y-2">
+                    {parseList(selectedFinding.implementation_steps).map((step, idx) => (
+                      <div key={idx} className="flex items-start gap-3 p-3 bg-slate-900/40 border border-slate-800 rounded-xl text-sm">
+                        <span className="w-5 h-5 rounded-full bg-primary-500/20 text-primary-400 text-xs flex items-center justify-center font-bold shrink-0 mt-0.5">
+                          {idx + 1}
+                        </span>
+                        <span className="text-slate-300 leading-normal">{step}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* VERIFICATION STEPS */}
+              {parseList(selectedFinding.verification_steps).length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <Terminal size={14} className="text-cyan-400" />
+                    Verification & Retesting Commands
+                  </h4>
+                  <div className="space-y-2">
+                    {parseList(selectedFinding.verification_steps).map((step, idx) => (
+                      <div key={idx} className="p-3 bg-slate-900/40 border border-slate-800 rounded-xl text-xs text-slate-300 font-mono">
+                        {step}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Remediation Guidelines (from KB) */}
+              <div className="space-y-2 pt-2 border-t border-slate-800/80">
                 <h4 className="text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
                   <Sparkles size={14} className="text-primary-400" />
-                  <span>Secure Coding & Remediation Guidelines</span>
+                  <span>Knowledge Base Baseline Guidelines</span>
                 </h4>
                 <div className="bg-primary-500/5 border border-primary-500/10 rounded-xl p-4 space-y-2.5">
                   {(selectedFinding.remediation || selectedFinding.recommendation || 'Validate all untrusted input parameters.').split('\n').map((rec, rIdx) => (
@@ -687,32 +825,6 @@ const SourceCodeScanner = () => {
                   ))}
                 </div>
               </div>
-
-              {/* Suggested Fix Box */}
-              {selectedFinding.suggested_fix && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 text-primary-400">
-                      <Sparkles size={14} />
-                      <span>Suggested Fix (Example Safer Implementation)</span>
-                    </h4>
-                    <button
-                      onClick={() => handleCopyFix(selectedFinding.suggested_fix)}
-                      className="flex items-center gap-1 text-xs text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 transition-colors"
-                    >
-                      {copiedFix ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
-                      <span>{copiedFix ? 'Copied' : 'Copy'}</span>
-                    </button>
-                  </div>
-
-                  <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 font-mono text-xs text-emerald-400 leading-relaxed overflow-x-auto shadow-inner">
-                    <pre>{selectedFinding.suggested_fix}</pre>
-                  </div>
-                  <p className="text-[11px] text-slate-500 italic">
-                    Note: Suggested implementations are defensive examples. Review context and test thoroughly before applying to production.
-                  </p>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -724,10 +836,10 @@ const SourceCodeScanner = () => {
           <div className="w-full max-w-lg glass-panel rounded-2xl p-6 relative border border-slate-800">
             <h3 className="text-xl font-bold font-outfit text-white mb-2 flex items-center gap-2">
               <FolderGit2 size={22} className="text-primary-500" />
-              <span>Upload Source Code Project</span>
+              <span>Upload Source Code (Project ZIP or Source File)</span>
             </h3>
             <p className="text-slate-400 text-sm mb-6">
-              Select or drop your application project ZIP archive (.zip). The SAST engine extracts and analyzes Python, JavaScript/React, and Java files safely.
+              Select or drop your application project ZIP archive (.zip) or individual source file (.py, .java, .cpp, .c, .js, .ts, .php, .cs, .go). The SAST engine extracts and analyzes security flaws safely.
             </p>
 
             {uploadError && (
@@ -741,7 +853,7 @@ const SourceCodeScanner = () => {
                 <input
                   type="file"
                   required
-                  accept=".zip"
+                  accept=".zip,.py,.java,.cpp,.cc,.c,.h,.hpp,.js,.ts,.tsx,.jsx,.php,.cs,.go,.rb"
                   onChange={handleFileChange}
                   className="absolute inset-0 opacity-0 cursor-pointer"
                   disabled={uploading}
@@ -756,8 +868,8 @@ const SourceCodeScanner = () => {
                 ) : (
                   <>
                     <Upload className="text-slate-600 mb-3" size={32} />
-                    <span className="text-slate-300 text-sm font-semibold">Click to select project ZIP or drag it here</span>
-                    <span className="text-slate-500 text-xs mt-1">Accepts standard .zip archives (max 50MB)</span>
+                    <span className="text-slate-300 text-sm font-semibold">Click to select project ZIP or source file</span>
+                    <span className="text-slate-500 text-xs mt-1">Accepts standard .zip archives or source files (max 50MB)</span>
                   </>
                 )}
               </div>
@@ -792,6 +904,14 @@ const SourceCodeScanner = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Full Remediation Inspector Modal */}
+      {inspectingFinding && (
+        <RemediationInspector
+          finding={inspectingFinding}
+          onClose={() => setInspectingFinding(null)}
+        />
       )}
     </div>
   );

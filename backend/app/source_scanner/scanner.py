@@ -1,7 +1,8 @@
 """
 Source Code Scanner Coordinator
-Walks directory, detects languages, runs static rules, enriches with Knowledge Base,
-and returns aggregated results.
+Walks directory or scans individual files, detects languages & frameworks,
+runs static rules across Python, JavaScript, TypeScript, Java, C, C++, PHP, C#, and Go,
+enriches findings with Knowledge Base, and returns aggregated results.
 """
 
 import os
@@ -11,6 +12,8 @@ from sqlalchemy.orm import Session
 from app.source_scanner.models import ScanFinding, FileScanResult, ScanSummary
 from app.source_scanner.language_detector import (
     detect_language,
+    detect_language_and_context,
+    detect_framework_and_library,
     is_binary_file,
     is_ignored_directory,
     should_skip_path
@@ -18,6 +21,10 @@ from app.source_scanner.language_detector import (
 from app.source_scanner.languages.python_rules import scan_python_code
 from app.source_scanner.languages.javascript_rules import scan_javascript_code
 from app.source_scanner.languages.java_rules import scan_java_code
+from app.source_scanner.languages.c_cpp_rules import scan_c_cpp_code
+from app.source_scanner.languages.php_rules import scan_php_code
+from app.source_scanner.languages.csharp_rules import scan_csharp_code
+from app.source_scanner.languages.go_rules import scan_go_code
 from app.models.knowledge_base import KnowledgeBaseItem
 
 
@@ -47,13 +54,64 @@ def enrich_finding_with_kb(finding: ScanFinding, db: Optional[Session] = None):
             finding.severity = kb_item.severity
 
 
+def scan_single_file_content(
+    content: str,
+    filename: str = "source_code",
+    language: Optional[str] = None,
+    db: Optional[Session] = None
+) -> Optional[FileScanResult]:
+    """
+    Scans a single source code string without needing disk files.
+    Determines language automatically if not specified.
+    """
+    context = detect_language_and_context(filename, content)
+    lang = language or context["language"]
+    if not lang or lang.lower() == "unknown":
+        lang = detect_language(filename, content) or "unknown"
+
+    framework = context.get("framework")
+    db_lib = context.get("database_or_library")
+
+    lines = content.splitlines()
+    line_count = len(lines)
+    findings: List[ScanFinding] = []
+
+    lang_lower = lang.lower()
+    if lang_lower == "python":
+        findings = scan_python_code(filename, content)
+    elif lang_lower in ("javascript", "typescript"):
+        findings = scan_javascript_code(filename, content)
+    elif lang_lower == "java":
+        findings = scan_java_code(filename, content)
+    elif lang_lower in ("c", "cpp"):
+        findings = scan_c_cpp_code(filename, content)
+    elif lang_lower == "php":
+        findings = scan_php_code(filename, content)
+    elif lang_lower == "csharp":
+        findings = scan_csharp_code(filename, content)
+    elif lang_lower == "go":
+        findings = scan_go_code(filename, content)
+
+    for finding in findings:
+        finding.framework = framework
+        finding.database_or_lib = db_lib
+        enrich_finding_with_kb(finding, db)
+
+    return FileScanResult(
+        file_path=filename,
+        language=lang,
+        line_count=line_count,
+        findings=findings
+    )
+
+
 def scan_file(
     file_path: str,
     base_dir: Optional[str] = None,
     db: Optional[Session] = None
 ) -> Optional[FileScanResult]:
     """
-    Scans a single source file and returns FileScanResult.
+    Scans a single source file on disk and returns FileScanResult.
     """
     language = detect_language(file_path)
     if not language:
@@ -68,9 +126,6 @@ def scan_file(
     except Exception:
         return None
 
-    lines = content.splitlines()
-    line_count = len(lines)
-
     # Compute clean relative display path
     display_path = file_path
     if base_dir:
@@ -79,25 +134,7 @@ def scan_file(
         except Exception:
             display_path = os.path.basename(file_path)
 
-    findings: List[ScanFinding] = []
-
-    if language == "python":
-        findings = scan_python_code(display_path, content)
-    elif language == "javascript":
-        findings = scan_javascript_code(display_path, content)
-    elif language == "java":
-        findings = scan_java_code(display_path, content)
-
-    # Enrich findings from Knowledge Base
-    for finding in findings:
-        enrich_finding_with_kb(finding, db)
-
-    return FileScanResult(
-        file_path=display_path,
-        language=language,
-        line_count=line_count,
-        findings=findings
-    )
+    return scan_single_file_content(content, filename=display_path, language=language, db=db)
 
 
 def scan_directory(dir_path: str, db: Optional[Session] = None) -> ScanSummary:
