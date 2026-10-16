@@ -7,7 +7,8 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_source_code_access
+from app.core.roles import has_source_code_access, get_role_label
 from app.models.user import User
 from app.schemas.source_code import (
     SourceCodeAnalysisResponse,
@@ -38,7 +39,7 @@ SOURCE_EXTENSIONS = {
 async def analyze_source_code(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_source_code_access)
 ):
     """
     Accepts project ZIP archive or single source code file (.py, .java, .cpp, .c, .js, .ts, .php, .cs, .go),
@@ -154,10 +155,13 @@ async def analyze_source_code(
 @router.get("/analyses", response_model=List[SourceCodeAnalysisResponse])
 def list_analyses(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_source_code_access)
 ):
-    """Lists all source code analyses conducted by current user."""
-    analyses = source_code_service.get_analyses_by_user(db, current_user.id)
+    """Lists all source code analyses cleared for current user or organization."""
+    if current_user.role in {"cdac_officer", "admin", "officer"}:
+        analyses = db.query(source_code_service.SourceCodeAnalysis).order_by(source_code_service.SourceCodeAnalysis.created_at.desc()).all()
+    else:
+        analyses = source_code_service.get_analyses_by_user(db, current_user.id)
     return analyses
 
 
@@ -165,7 +169,7 @@ def list_analyses(
 def get_analysis_detail(
     analysis_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_source_code_access)
 ):
     """Retrieves full details and vulnerability findings for a specific scan."""
     analysis = source_code_service.get_analysis(db, analysis_id)
@@ -173,7 +177,7 @@ def get_analysis_detail(
     if not analysis:
         raise HTTPException(status_code=404, detail="Source code analysis record not found.")
 
-    if analysis.user_id != current_user.id:
+    if analysis.user_id != current_user.id and current_user.role not in {"cdac_officer", "admin", "officer"}:
         raise HTTPException(status_code=403, detail="Not authorized to access this analysis.")
 
     return analysis
@@ -183,7 +187,7 @@ def get_analysis_detail(
 def delete_analysis(
     analysis_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_source_code_access)
 ):
     """Deletes an analysis record and all associated findings."""
     analysis = source_code_service.get_analysis(db, analysis_id)
@@ -191,7 +195,7 @@ def delete_analysis(
     if not analysis:
         raise HTTPException(status_code=404, detail="Analysis record not found.")
 
-    if analysis.user_id != current_user.id:
+    if analysis.user_id != current_user.id and current_user.role not in {"cdac_officer", "admin", "officer"}:
         raise HTTPException(status_code=403, detail="Not authorized to delete this analysis.")
 
     source_code_service.delete_analysis(db, analysis_id)
@@ -214,7 +218,7 @@ def delete_analysis(
 def download_analysis_report(
     analysis_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_source_code_access)
 ):
     """Generates and streams a PDF report for the given source code analysis."""
     analysis = source_code_service.get_analysis(db, analysis_id)
@@ -222,7 +226,7 @@ def download_analysis_report(
     if not analysis:
         raise HTTPException(status_code=404, detail="Analysis record not found.")
 
-    if analysis.user_id != current_user.id:
+    if analysis.user_id != current_user.id and current_user.role not in {"cdac_officer", "admin", "officer"}:
         raise HTTPException(status_code=403, detail="Not authorized to download this report.")
 
     analysis_meta = {

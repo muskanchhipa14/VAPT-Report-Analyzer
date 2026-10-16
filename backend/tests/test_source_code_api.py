@@ -14,19 +14,22 @@ client = TestClient(app)
 @pytest.fixture(scope="module")
 def auth_header():
     db = SessionLocal()
-    # Ensure test user exists
+    # Ensure test user exists with C-DAC officer authorization
     user = db.query(User).filter(User.email == "test_sast_user@example.com").first()
     if not user:
         user = User(
             name="SAST Test User",
             email="test_sast_user@example.com",
             password="SecretPassword123!",
-            role="user"
+            role="security_analyst"
         )
         db.add(user)
         db.commit()
         db.refresh(user)
-    token = create_access_token({"sub": user.email})
+    else:
+        user.role = "security_analyst"
+        db.commit()
+    token = create_access_token({"sub": user.email, "role": user.role})
     db.close()
     return {"Authorization": f"Bearer {token}"}
 
@@ -40,12 +43,37 @@ def other_user_auth_header():
             name="Other Test User",
             email="other_sast_user@example.com",
             password="SecretPassword123!",
+            role="security_analyst"
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    else:
+        user.role = "security_analyst"
+        db.commit()
+    token = create_access_token({"sub": user.email, "role": user.role})
+    db.close()
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture(scope="module")
+def normal_user_auth_header():
+    db = SessionLocal()
+    user = db.query(User).filter(User.email == "restricted_user@example.com").first()
+    if not user:
+        user = User(
+            name="Restricted Normal User",
+            email="restricted_user@example.com",
+            password="SecretPassword123!",
             role="user"
         )
         db.add(user)
         db.commit()
         db.refresh(user)
-    token = create_access_token({"sub": user.email})
+    else:
+        user.role = "user"
+        db.commit()
+    token = create_access_token({"sub": user.email, "role": user.role})
     db.close()
     return {"Authorization": f"Bearer {token}"}
 
@@ -171,4 +199,44 @@ def test_upload_and_analyze_single_file(auth_header):
     findings = data["findings"]
     assert any(f["cwe_id"] == "CWE-120" for f in findings)
     assert any(f.get("secure_code") is not None for f in findings)
+
+
+def test_normal_user_denied_source_code_access(normal_user_auth_header, sample_zip_bytes):
+    """
+    C-DAC Confidentiality Policy Test:
+    Ensures that standard users ('user' role) are strictly denied from
+    fetching, listing, or analyzing confidential source code.
+    """
+    # 1. Listing analyses should return 403 Forbidden
+    res_list = client.get("/source-code/analyses", headers=normal_user_auth_header)
+    assert res_list.status_code == 403
+    assert "C-DAC Confidentiality Guidelines" in res_list.json()["detail"]
+
+    # 2. Uploading & Scanning source code should return 403 Forbidden
+    res_upload = client.post(
+        "/source-code/analyze",
+        headers=normal_user_auth_header,
+        files={"file": ("project.zip", sample_zip_bytes, "application/zip")}
+    )
+    assert res_upload.status_code == 403
+    assert "C-DAC Confidentiality Guidelines" in res_upload.json()["detail"]
+
+    # 3. Direct analysis engine POST /api/analyze/source-code should return 403 Forbidden
+    res_engine = client.post(
+        "/api/analyze/source-code",
+        headers=normal_user_auth_header,
+        data={"code_content": "import os; os.system('echo hi')"}
+    )
+    assert res_engine.status_code == 403
+    assert "C-DAC Confidentiality Guidelines" in res_engine.json()["detail"]
+
+    # 4. Audit Log verification: Check that the unauthorized attempt was recorded
+    log_res = client.get("/logs/", headers=normal_user_auth_header)
+    assert log_res.status_code == 200
+    logs = log_res.json()
+    assert any(
+        log["status"] == "Denied" and "Access Control" in log["module"]
+        for log in logs
+    )
+
 

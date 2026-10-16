@@ -9,7 +9,29 @@ from app.source_scanner.scanner import scan_single_file_content
 from app.services.pdf_parser import parse_vapt_text
 from app.services.correlation_service import correlate_report_and_code
 
+from app.models.user import User
+from app.core.security import create_access_token
+
 client = TestClient(app)
+
+
+@pytest.fixture(scope="module")
+def auth_header():
+    db = SessionLocal()
+    user = db.query(User).filter(User.email == "officer@cdac.in").first()
+    if not user:
+        user = User(
+            name="C-DAC Security Officer",
+            email="officer@cdac.in",
+            password="SecretPassword123!",
+            role="cdac_officer"
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    token = create_access_token({"sub": user.email, "role": user.role})
+    db.close()
+    return {"Authorization": f"Bearer {token}"}
 
 
 def test_python_source_code_remediation():
@@ -400,13 +422,14 @@ def test_api_remediation_generate_endpoint():
     assert "subprocess.run" in data["secure_code"] or "shell=False" in data["secure_code"]
 
 
-def test_api_analyze_source_code_pasted():
+def test_api_analyze_source_code_pasted(auth_header):
     """
     Tests POST /api/analyze/source-code with pasted source code.
     """
     py_code = 'query = "SELECT * FROM items WHERE name = \'" + user_input + "\'"\ncursor.execute(query)'
     response = client.post(
         "/api/analyze/source-code",
+        headers=auth_header,
         data={
             "code_content": py_code,
             "filename": "search.py",

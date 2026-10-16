@@ -5,16 +5,28 @@ import RemediationInspector from './RemediationInspector';
 import {
   Upload, FileText, Trash2, Download, ExternalLink,
   ShieldCheck, AlertTriangle, Loader, CheckCircle, RefreshCw, FolderGit2,
-  Sparkles, Code2, Layers, FileCode, X
+  Sparkles, Code2, Layers, FileCode, X, Lock, Shield
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 
-const Dashboard = () => {
+const Dashboard = ({ user: propUser }) => {
   const [reports, setReports] = useState([]);
   const [vulnerabilities, setVulnerabilities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [downloadingReportId, setDownloadingReportId] = useState(null);
   const navigate = useNavigate();
+
+  const storedUser = (() => {
+    if (propUser) return propUser;
+    try {
+      return JSON.parse(localStorage.getItem('user') || '{}');
+    } catch {
+      return {};
+    }
+  })();
+
+  const userRole = (storedUser?.role || 'user').toLowerCase();
+  const isSourceCodeAuthorized = ['cdac_officer', 'admin', 'officer', 'security_officer', 'security_analyst', 'auditor'].includes(userRole);
 
   // Multi-Flow Upload / Analysis State
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
@@ -606,6 +618,7 @@ const Dashboard = () => {
               >
                 <Code2 size={14} />
                 <span>Option B: Source Code</span>
+                {!isSourceCodeAuthorized && <Lock size={12} className="text-amber-400 ml-0.5" />}
               </button>
 
               <button
@@ -621,6 +634,7 @@ const Dashboard = () => {
               >
                 <Layers size={14} />
                 <span>Option C: Combined</span>
+                {!isSourceCodeAuthorized && <Lock size={12} className="text-amber-400 ml-0.5" />}
               </button>
             </div>
 
@@ -686,158 +700,194 @@ const Dashboard = () => {
 
               {/* TAB B: SOURCE CODE */}
               {analysisTab === 'source' && (
-                <form onSubmit={handleRunSourceAnalysis} className="space-y-4">
-                  <p className="text-slate-400 text-xs">
-                    Upload source files (.py, .java, .cpp, .c, .js, .ts, .php, .cs, .go, .rb, or .zip archive) or paste code below. Automatic language and framework detection runs instantly.
-                  </p>
-
-                  {/* File Upload Option */}
-                  <div className="border-2 border-dashed border-slate-800 hover:border-primary-500/50 rounded-2xl p-6 flex flex-col items-center justify-center text-center cursor-pointer relative">
-                    <input
-                      type="file"
-                      accept=".py,.java,.cpp,.cc,.c,.h,.js,.ts,.tsx,.jsx,.php,.cs,.go,.rb,.zip"
-                      onChange={(e) => setSourceFile(e.target.files[0])}
-                      className="absolute inset-0 opacity-0 cursor-pointer"
-                      disabled={uploading}
-                    />
-                    {sourceFile ? (
-                      <>
-                        <CheckCircle className="text-emerald-500 mb-2" size={28} />
-                        <span className="text-slate-200 text-sm font-semibold truncate max-w-xs">{sourceFile.name}</span>
-                        <span className="text-slate-500 text-xs mt-1">{(sourceFile.size / 1024 / 1024).toFixed(2)} MB</span>
-                      </>
-                    ) : (
-                      <>
-                        <FileCode className="text-slate-600 mb-2" size={28} />
-                        <span className="text-slate-300 text-xs font-semibold">Upload Single Source File or Project .ZIP</span>
-                        <span className="text-slate-500 text-[11px] mt-1">Supports Python, Java, C/C++, JS/TS, PHP, C#, Go</span>
-                      </>
-                    )}
+                !isSourceCodeAuthorized ? (
+                  <div className="p-8 text-center bg-slate-900/60 border border-red-500/20 rounded-2xl space-y-4 my-2">
+                    <div className="w-12 h-12 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center mx-auto">
+                      <Lock size={24} />
+                    </div>
+                    <div>
+                      <h4 className="text-white font-bold text-base">C-DAC Confidential Source Code Policy</h4>
+                      <p className="text-slate-400 text-xs mt-1.5 max-w-md mx-auto leading-relaxed">
+                        Source code scanning, AST structural parsing, and repository inspection are classified under C-DAC security guidelines. Standard user accounts cannot upload or analyze proprietary code.
+                      </p>
+                    </div>
+                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full text-[11px] text-amber-300">
+                      <Shield size={12} />
+                      <span>Security Officer / Analyst Clearance Required</span>
+                    </div>
                   </div>
+                ) : (
+                  <form onSubmit={handleRunSourceAnalysis} className="space-y-4">
+                    <p className="text-slate-400 text-xs">
+                      Upload source files (.py, .java, .cpp, .c, .js, .ts, .php, .cs, .go, .rb, or .zip archive) or paste code below. Automatic language and framework detection runs instantly.
+                    </p>
 
-                  {/* OR Paste Code */}
-                  <div className="relative flex py-1 items-center">
-                    <div className="flex-grow border-t border-slate-800"></div>
-                    <span className="flex-shrink mx-3 text-slate-500 text-xs uppercase tracking-wider font-semibold">OR Paste Snippet</span>
-                    <div className="flex-grow border-t border-slate-800"></div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-2 gap-2">
+                    {/* File Upload Option */}
+                    <div className="border-2 border-dashed border-slate-800 hover:border-primary-500/50 rounded-2xl p-6 flex flex-col items-center justify-center text-center cursor-pointer relative">
                       <input
-                        type="text"
-                        placeholder="Filename (e.g. login.py, app.java)"
-                        value={sourceFileName}
-                        onChange={(e) => setSourceFileName(e.target.value)}
-                        className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-primary-500"
+                        type="file"
+                        accept=".py,.java,.cpp,.cc,.c,.h,.js,.ts,.tsx,.jsx,.php,.cs,.go,.rb,.zip"
+                        onChange={(e) => setSourceFile(e.target.files[0])}
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                        disabled={uploading}
                       />
-                      <select
-                        value={sourceLanguage}
-                        onChange={(e) => setSourceLanguage(e.target.value)}
-                        className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-primary-500"
-                      >
-                        <option value="">Auto-Detect Language</option>
-                        <option value="python">Python</option>
-                        <option value="java">Java</option>
-                        <option value="javascript">JavaScript / React</option>
-                        <option value="typescript">TypeScript</option>
-                        <option value="c">C</option>
-                        <option value="cpp">C++</option>
-                        <option value="php">PHP</option>
-                        <option value="csharp">C# (.NET)</option>
-                        <option value="go">Go</option>
-                      </select>
+                      {sourceFile ? (
+                        <>
+                          <CheckCircle className="text-emerald-500 mb-2" size={28} />
+                          <span className="text-slate-200 text-sm font-semibold truncate max-w-xs">{sourceFile.name}</span>
+                          <span className="text-slate-500 text-xs mt-1">{(sourceFile.size / 1024 / 1024).toFixed(2)} MB</span>
+                        </>
+                      ) : (
+                        <>
+                          <FileCode className="text-slate-600 mb-2" size={28} />
+                          <span className="text-slate-300 text-xs font-semibold">Upload Single Source File or Project .ZIP</span>
+                          <span className="text-slate-500 text-[11px] mt-1">Supports Python, Java, C/C++, JS/TS, PHP, C#, Go</span>
+                        </>
+                      )}
                     </div>
 
-                    <textarea
-                      placeholder="// Paste your source code snippet here..."
-                      rows={5}
-                      value={sourceCodeText}
-                      onChange={(e) => setSourceCodeText(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-xs text-slate-300 outline-none focus:border-primary-500"
-                    />
-                  </div>
+                    {/* OR Paste Code */}
+                    <div className="relative flex py-1 items-center">
+                      <div className="flex-grow border-t border-slate-800"></div>
+                      <span className="flex-shrink mx-3 text-slate-500 text-xs uppercase tracking-wider font-semibold">OR Paste Snippet</span>
+                      <div className="flex-grow border-t border-slate-800"></div>
+                    </div>
 
-                  <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
-                    <button
-                      type="button"
-                      onClick={() => setShowAnalysisModal(false)}
-                      className="px-4 py-2 text-xs font-semibold bg-slate-900 border border-slate-800 rounded-xl hover:text-white"
-                      disabled={uploading}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-5 py-2.5 text-xs font-semibold bg-primary-600 hover:bg-primary-700 text-white rounded-xl flex items-center gap-2 shadow-lg"
-                      disabled={uploading || (!sourceFile && !sourceCodeText.trim())}
-                    >
-                      {uploading ? <Loader size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                      <span>Scan & Remediate</span>
-                    </button>
-                  </div>
-                </form>
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          placeholder="Filename (e.g. login.py, app.java)"
+                          value={sourceFileName}
+                          onChange={(e) => setSourceFileName(e.target.value)}
+                          className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-primary-500"
+                        />
+                        <select
+                          value={sourceLanguage}
+                          onChange={(e) => setSourceLanguage(e.target.value)}
+                          className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-primary-500"
+                        >
+                          <option value="">Auto-Detect Language</option>
+                          <option value="python">Python</option>
+                          <option value="java">Java</option>
+                          <option value="javascript">JavaScript / React</option>
+                          <option value="typescript">TypeScript</option>
+                          <option value="c">C</option>
+                          <option value="cpp">C++</option>
+                          <option value="php">PHP</option>
+                          <option value="csharp">C# (.NET)</option>
+                          <option value="go">Go</option>
+                        </select>
+                      </div>
+
+                      <textarea
+                        placeholder="// Paste your source code snippet here..."
+                        rows={5}
+                        value={sourceCodeText}
+                        onChange={(e) => setSourceCodeText(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-xs text-slate-300 outline-none focus:border-primary-500"
+                      />
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => setShowAnalysisModal(false)}
+                        className="px-4 py-2 text-xs font-semibold bg-slate-900 border border-slate-800 rounded-xl hover:text-white"
+                        disabled={uploading}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-5 py-2.5 text-xs font-semibold bg-primary-600 hover:bg-primary-700 text-white rounded-xl flex items-center gap-2 shadow-lg"
+                        disabled={uploading || (!sourceFile && !sourceCodeText.trim())}
+                      >
+                        {uploading ? <Loader size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                        <span>Scan & Remediate</span>
+                      </button>
+                    </div>
+                  </form>
+                )
               )}
 
               {/* TAB C: COMBINED */}
               {analysisTab === 'combined' && (
-                <form onSubmit={handleRunCombinedAnalysis} className="space-y-4">
-                  <p className="text-slate-400 text-xs">
-                    Cross-correlate a VAPT report with actual source code. The engine verifies report claims against source code ground truth, confirms flaws, and generates verified code replacements.
-                  </p>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Report File */}
-                    <div className="border border-slate-800 rounded-xl p-4 bg-slate-900/40 text-center relative">
-                      <span className="text-xs font-bold text-slate-300 block mb-2">1. VAPT Report File</span>
-                      <input
-                        type="file"
-                        required
-                        accept=".pdf,.docx,.txt,image/*"
-                        onChange={(e) => setCombReportFile(e.target.files[0])}
-                        className="text-xs text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:bg-primary-500/20 file:text-primary-400"
-                      />
+                !isSourceCodeAuthorized ? (
+                  <div className="p-8 text-center bg-slate-900/60 border border-red-500/20 rounded-2xl space-y-4 my-2">
+                    <div className="w-12 h-12 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center mx-auto">
+                      <Lock size={24} />
                     </div>
-
-                    {/* Source File */}
-                    <div className="border border-slate-800 rounded-xl p-4 bg-slate-900/40 text-center relative">
-                      <span className="text-xs font-bold text-slate-300 block mb-2">2. Source Code (.zip or file)</span>
-                      <input
-                        type="file"
-                        required
-                        accept=".zip,.py,.java,.cpp,.c,.js,.ts,.php,.cs,.go"
-                        onChange={(e) => setCombSourceFile(e.target.files[0])}
-                        className="text-xs text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:bg-primary-500/20 file:text-primary-400"
-                      />
+                    <div>
+                      <h4 className="text-white font-bold text-base">C-DAC Confidential Source Code Policy</h4>
+                      <p className="text-slate-400 text-xs mt-1.5 max-w-md mx-auto leading-relaxed">
+                        Combined report and ground-truth code correlation requires uploading and analyzing confidential source files. This operation is restricted to authorized C-DAC Officers and Analysts.
+                      </p>
+                    </div>
+                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full text-[11px] text-amber-300">
+                      <Shield size={12} />
+                      <span>Security Officer / Analyst Clearance Required</span>
                     </div>
                   </div>
+                ) : (
+                  <form onSubmit={handleRunCombinedAnalysis} className="space-y-4">
+                    <p className="text-slate-400 text-xs">
+                      Cross-correlate a VAPT report with actual source code. The engine verifies report claims against source code ground truth, confirms flaws, and generates verified code replacements.
+                    </p>
 
-                  <div className="p-3 bg-primary-500/5 border border-primary-500/15 rounded-xl text-xs text-slate-300 flex items-start gap-2">
-                    <Sparkles size={16} className="text-primary-400 shrink-0 mt-0.5" />
-                    <span>
-                      High-Confidence Workflow: Correlates report line numbers and CWE identifiers directly with the uploaded code files to prove exploitability and generate line-by-line patch code.
-                    </span>
-                  </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Report File */}
+                      <div className="border border-slate-800 rounded-xl p-4 bg-slate-900/40 text-center relative">
+                        <span className="text-xs font-bold text-slate-300 block mb-2">1. VAPT Report File</span>
+                        <input
+                          type="file"
+                          required
+                          accept=".pdf,.docx,.txt,image/*"
+                          onChange={(e) => setCombReportFile(e.target.files[0])}
+                          className="text-xs text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:bg-primary-500/20 file:text-primary-400"
+                        />
+                      </div>
 
-                  <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
-                    <button
-                      type="button"
-                      onClick={() => setShowAnalysisModal(false)}
-                      className="px-4 py-2 text-xs font-semibold bg-slate-900 border border-slate-800 rounded-xl hover:text-white"
-                      disabled={uploading}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-5 py-2.5 text-xs font-semibold bg-primary-600 hover:bg-primary-700 text-white rounded-xl flex items-center gap-2 shadow-lg"
-                      disabled={uploading || !combReportFile || !combSourceFile}
-                    >
-                      {uploading ? <Loader size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                      <span>Run Combined Correlation</span>
-                    </button>
-                  </div>
-                </form>
+                      {/* Source File */}
+                      <div className="border border-slate-800 rounded-xl p-4 bg-slate-900/40 text-center relative">
+                        <span className="text-xs font-bold text-slate-300 block mb-2">2. Source Code (.zip or file)</span>
+                        <input
+                          type="file"
+                          required
+                          accept=".zip,.py,.java,.cpp,.c,.js,.ts,.php,.cs,.go"
+                          onChange={(e) => setCombSourceFile(e.target.files[0])}
+                          className="text-xs text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:bg-primary-500/20 file:text-primary-400"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-primary-500/5 border border-primary-500/15 rounded-xl text-xs text-slate-300 flex items-start gap-2">
+                      <Sparkles size={16} className="text-primary-400 shrink-0 mt-0.5" />
+                      <span>
+                        High-Confidence Workflow: Correlates report line numbers and CWE identifiers directly with the uploaded code files to prove exploitability and generate line-by-line patch code.
+                      </span>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => setShowAnalysisModal(false)}
+                        className="px-4 py-2 text-xs font-semibold bg-slate-900 border border-slate-800 rounded-xl hover:text-white"
+                        disabled={uploading}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-5 py-2.5 text-xs font-semibold bg-primary-600 hover:bg-primary-700 text-white rounded-xl flex items-center gap-2 shadow-lg"
+                        disabled={uploading || !combReportFile || !combSourceFile}
+                      >
+                        {uploading ? <Loader size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                        <span>Run Combined Correlation</span>
+                      </button>
+                    </div>
+                  </form>
+                )
               )}
             </div>
           </div>

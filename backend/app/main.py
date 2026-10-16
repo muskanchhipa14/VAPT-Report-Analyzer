@@ -94,14 +94,17 @@ def _ensure_sqlite_columns():
 
 import os
 
+from app.services.user_service import seed_cdac_users
+
 @app.on_event("startup")
 def startup_event():
     _ensure_sqlite_columns()
     db = SessionLocal()
     try:
+        seed_cdac_users(db)
         seed_knowledge_base(db)
     except Exception as e:
-        print(f"Error seeding knowledge base: {e}")
+        print(f"Error during startup initialization: {e}")
     finally:
         db.close()
 

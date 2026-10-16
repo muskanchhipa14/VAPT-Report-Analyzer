@@ -9,6 +9,7 @@ const Login = ({ onLoginSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [role, setRole] = useState('user');
   
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -29,8 +30,8 @@ const Login = ({ onLoginSuccess }) => {
       }
 
       try {
-        // Register user via backend POST /users/
-        await authAPI.register(name, email, password);
+        // Register user via backend POST /users/ with role
+        await authAPI.register(name, email, password, role);
         setSuccess('Registration successful! Please sign in with your credentials.');
         
         // Clear inputs
@@ -38,6 +39,7 @@ const Login = ({ onLoginSuccess }) => {
         setEmail('');
         setPassword('');
         setConfirmPassword('');
+        setRole('user');
         
         // Switch back to Sign In mode after 2 seconds
         setTimeout(() => {
@@ -83,13 +85,17 @@ const Login = ({ onLoginSuccess }) => {
 
       <div className="w-full max-w-md glass-panel rounded-2xl p-8 shadow-2xl relative z-10 border border-slate-800">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center p-3 bg-primary-500/10 border border-primary-500/20 rounded-xl text-primary-500 mb-4 pulse-indicator">
+          <div className="inline-flex items-center justify-center p-3 bg-primary-500/10 border border-primary-500/20 rounded-xl text-primary-500 mb-3 pulse-indicator">
             <Shield size={36} />
           </div>
-          <h1 className="text-2xl font-bold font-outfit text-white tracking-wide uppercase">VAPT SHIELD</h1>
-          <p className="text-slate-400 text-sm mt-1">
-            {isSignup ? 'Create a secure analyst account' : 'Sign in to access security reports & analysis'}
+          <h1 className="text-2xl font-bold font-outfit text-white tracking-wide uppercase">C-DAC VAPT SHIELD</h1>
+          <p className="text-xs text-primary-400 font-medium tracking-wide uppercase mt-1">
+            Centre for Development of Advanced Computing
           </p>
+          <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 bg-slate-900/80 border border-slate-800 rounded-full text-[11px] text-slate-400">
+            <Lock size={12} className="text-amber-400" />
+            <span>Confidential Data Protection & RBAC</span>
+          </div>
         </div>
 
         {error && (
@@ -106,7 +112,7 @@ const Login = ({ onLoginSuccess }) => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {isSignup && (
             <div>
               <label className="block text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">Full Name</label>
@@ -115,8 +121,8 @@ const Login = ({ onLoginSuccess }) => {
                 <input
                   type="text"
                   required
-                  className="w-full bg-slate-900/50 border border-slate-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 rounded-xl py-3 pl-10 pr-4 text-white placeholder-slate-500 outline-none transition-all"
-                  placeholder="Security Engineer"
+                  className="w-full bg-slate-900/50 border border-slate-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 rounded-xl py-3 pl-10 pr-4 text-white placeholder-slate-500 outline-none transition-all text-sm"
+                  placeholder="Officer Name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   disabled={loading}
@@ -132,8 +138,8 @@ const Login = ({ onLoginSuccess }) => {
               <input
                 type="email"
                 required
-                className="w-full bg-slate-900/50 border border-slate-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 rounded-xl py-3 pl-10 pr-4 text-white placeholder-slate-500 outline-none transition-all"
-                placeholder="name@company.com"
+                className="w-full bg-slate-900/50 border border-slate-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 rounded-xl py-3 pl-10 pr-4 text-white placeholder-slate-500 outline-none transition-all text-sm"
+                placeholder="officer@cdac.in"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={loading}
@@ -148,7 +154,7 @@ const Login = ({ onLoginSuccess }) => {
               <input
                 type="password"
                 required
-                className="w-full bg-slate-900/50 border border-slate-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 rounded-xl py-3 pl-10 pr-4 text-white placeholder-slate-500 outline-none transition-all"
+                className="w-full bg-slate-900/50 border border-slate-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 rounded-xl py-3 pl-10 pr-4 text-white placeholder-slate-500 outline-none transition-all text-sm"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -158,21 +164,42 @@ const Login = ({ onLoginSuccess }) => {
           </div>
 
           {isSignup && (
-            <div>
-              <label className="block text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">Confirm Password</label>
-              <div className="relative">
-                <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                <input
-                  type="password"
-                  required
-                  className="w-full bg-slate-900/50 border border-slate-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 rounded-xl py-3 pl-10 pr-4 text-white placeholder-slate-500 outline-none transition-all"
-                  placeholder="••••••••"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  disabled={loading}
-                />
+            <>
+              <div>
+                <label className="block text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">Confirm Password</label>
+                <div className="relative">
+                  <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <input
+                    type="password"
+                    required
+                    className="w-full bg-slate-900/50 border border-slate-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 rounded-xl py-3 pl-10 pr-4 text-white placeholder-slate-500 outline-none transition-all text-sm"
+                    placeholder="••••••••"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    disabled={loading}
+                  />
+                </div>
               </div>
-            </div>
+
+              <div>
+                <label className="block text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">
+                  Security Role & Clearance
+                </label>
+                <select
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                  disabled={loading}
+                  className="w-full bg-slate-900/80 border border-slate-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 rounded-xl py-3 px-3 text-white text-sm outline-none transition-all"
+                >
+                  <option value="cdac_officer">🛡️ C-DAC Security Officer (Full Source Code & Admin Access)</option>
+                  <option value="security_analyst">🔍 Security Analyst (Source Code Scanner & Audit Clearance)</option>
+                  <option value="user">👤 Standard User (Restricted - General VAPT Reports Only)</option>
+                </select>
+                <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
+                  Confidential source code scanning and fetching is restricted to C-DAC Officers and Analysts.
+                </p>
+              </div>
+            </>
           )}
 
           <div className="pt-2">
@@ -187,7 +214,7 @@ const Login = ({ onLoginSuccess }) => {
                   <span>Please wait...</span>
                 </>
               ) : (
-                <span>{isSignup ? 'Create Account' : 'Sign In'}</span>
+                <span>{isSignup ? 'Create Classified Account' : 'Sign In to Secure Portal'}</span>
               )}
             </button>
           </div>
@@ -198,7 +225,7 @@ const Login = ({ onLoginSuccess }) => {
             onClick={toggleMode}
             className="text-xs text-primary-400 hover:text-primary-300 font-semibold focus:outline-none transition-colors"
           >
-            {isSignup ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
+            {isSignup ? 'Already have credentials? Sign In' : "Don't have an account? Sign Up with Role"}
           </button>
         </div>
 

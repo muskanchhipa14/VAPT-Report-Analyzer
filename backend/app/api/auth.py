@@ -9,12 +9,27 @@ from app.schemas.auth import (
 )
 from app.services import auth_service
 from app.services.audit_helper import log_event
-from app.core.security import create_access_token
+from app.core.security import create_access_token, get_current_user
+from app.core.roles import get_role_label, has_source_code_access
+from app.models.user import User
 
 router = APIRouter(
     prefix="/auth",
     tags=["Authentication"]
 )
+
+
+@router.get("/me")
+def get_auth_me(current_user: User = Depends(get_current_user)):
+    """Returns currently authenticated user profile and confidentiality clearance."""
+    return {
+        "id": current_user.id,
+        "name": current_user.name,
+        "email": current_user.email,
+        "role": current_user.role,
+        "role_label": get_role_label(current_user.role),
+        "can_access_source_code": has_source_code_access(current_user.role)
+    }
 
 
 @router.post("/login", response_model=AuthResponse)
@@ -46,7 +61,7 @@ def login(
     log_event(
         db,
         user.name,
-        "Login",
+        f"Login ({get_role_label(user.role)})",
         "Authentication",
         "Success"
     )
@@ -62,7 +77,9 @@ def login(
             "id": user.id,
             "name": user.name,
             "email": user.email,
-            "role": user.role
+            "role": user.role,
+            "role_label": get_role_label(user.role),
+            "can_access_source_code": has_source_code_access(user.role)
         }
     }
 

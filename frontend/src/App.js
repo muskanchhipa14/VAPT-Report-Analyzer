@@ -75,8 +75,8 @@ function App() {
                   <Navbar user={user} onLogout={handleLogout} />
                   <main className="flex-1 bg-dark-950">
                     <Routes>
-                      <Route path="/" element={<Dashboard />} />
-                      <Route path="/source-code" element={<SourceCodeScanner />} />
+                      <Route path="/" element={<Dashboard user={user} />} />
+                      <Route path="/source-code" element={<SourceCodeScanner user={user} />} />
                       <Route path="/vulnerabilities" element={<VulnerabilityList />} />
                       <Route path="/knowledge-base" element={<KnowledgeBase />} />
                       <Route path="/logs" element={<AuditLogs />} />

@@ -1,22 +1,44 @@
 import React, { useState, useEffect } from 'react';
-import { sourceCodeAPI } from '../services/api';
+import { useNavigate } from 'react-router-dom';
+import { sourceCodeAPI, authAPI } from '../services/api';
 import RemediationInspector from './RemediationInspector';
 import {
   Upload, FileCode2, ShieldAlert, CheckCircle2,
   Trash2, Download, Search, Sparkles, Layers,
   Code2, RefreshCw, AlertTriangle,
-  FolderGit2, Terminal, Info, X, ChevronRight, Copy, Check, Database
+  FolderGit2, Terminal, Info, X, ChevronRight, Copy, Check, Database,
+  Shield, Lock, ArrowLeft
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 
-const SourceCodeScanner = () => {
+const SourceCodeScanner = ({ user: propUser }) => {
+  const navigate = useNavigate();
+
+  const storedUser = (() => {
+    if (propUser) return propUser;
+    try {
+      return JSON.parse(localStorage.getItem('user') || '{}');
+    } catch {
+      return {};
+    }
+  })();
+
+  const userRole = (storedUser?.role || 'user').toLowerCase();
+  const isAuthorized = ['cdac_officer', 'admin', 'officer', 'security_officer', 'security_analyst', 'auditor'].includes(userRole);
+
+  const [accessDeniedMessage, setAccessDeniedMessage] = useState(
+    !isAuthorized
+      ? "C-DAC Information Security Guidelines classify source code repositories as confidential assets. Standard users cannot fetch, view, or scan source code repositories."
+      : null
+  );
+
   const [analyses, setAnalyses] = useState([]);
   const [selectedAnalysis, setSelectedAnalysis] = useState(null);
   const [analysisDetail, setAnalysisDetail] = useState(null);
   const [selectedFinding, setSelectedFinding] = useState(null);
   const [inspectingFinding, setInspectingFinding] = useState(null);
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(isAuthorized);
   const [detailLoading, setDetailLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -32,6 +54,10 @@ const SourceCodeScanner = () => {
   const [confidenceFilter, setConfidenceFilter] = useState('');
 
   const fetchAnalyses = async (selectLatest = false) => {
+    if (!isAuthorized) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const data = await sourceCodeAPI.getAnalyses();
@@ -46,6 +72,9 @@ const SourceCodeScanner = () => {
       }
     } catch (e) {
       console.error('Failed to load source code analyses', e);
+      if (e.response?.status === 403) {
+        setAccessDeniedMessage(e.response?.data?.detail || "Access Denied: C-DAC Confidentiality Guidelines restrict source code access.");
+      }
     } finally {
       setLoading(false);
     }
@@ -226,6 +255,104 @@ const SourceCodeScanner = () => {
     name: k,
     findings: languageBreakdown[k],
   }));
+
+  if (!isAuthorized || accessDeniedMessage) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-12">
+        <div className="glass-panel border border-red-500/30 rounded-2xl p-8 sm:p-12 text-center shadow-2xl relative overflow-hidden bg-slate-950/80">
+          <div className="absolute -top-24 -left-24 w-72 h-72 bg-red-500/10 rounded-full blur-[90px] pointer-events-none"></div>
+          <div className="absolute -bottom-24 -right-24 w-72 h-72 bg-amber-500/10 rounded-full blur-[90px] pointer-events-none"></div>
+
+          <div className="relative z-10 flex flex-col items-center">
+            {/* Shield with Lock Emblem */}
+            <div className="relative mb-6">
+              <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 inline-flex items-center justify-center">
+                <Shield size={48} />
+              </div>
+              <div className="absolute -bottom-1 -right-1 p-1.5 bg-slate-900 border border-red-500/40 rounded-lg text-amber-400">
+                <Lock size={16} />
+              </div>
+            </div>
+
+            {/* Classification Badge */}
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-red-500/15 border border-red-500/30 rounded-full text-xs font-bold text-red-300 tracking-wider uppercase mb-3">
+              <span>Classified Asset • C-DAC Confidentiality Protocol</span>
+            </div>
+
+            <h1 className="text-2xl sm:text-3xl font-bold font-outfit text-white tracking-wide">
+              Source Code Access Restricted
+            </h1>
+
+            <p className="text-slate-300 text-sm sm:text-base mt-3 max-w-2xl leading-relaxed">
+              {accessDeniedMessage ||
+                "As C-DAC is a government organisation handling proprietary research and critical infrastructure, source code repositories cannot be accessed or fetched without elevated clearance."}
+            </p>
+
+            {/* Current user & Role banner */}
+            <div className="my-6 p-4 bg-slate-900/80 border border-slate-800 rounded-xl w-full max-w-lg text-left">
+              <div className="flex items-center justify-between text-xs mb-2">
+                <span className="text-slate-400 uppercase tracking-wider font-semibold">Active Identity</span>
+                <span className="text-slate-200 font-medium">{storedUser?.name || 'User'} ({storedUser?.email})</span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400 uppercase tracking-wider font-semibold">Assigned Role</span>
+                <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 font-semibold">
+                  {storedUser?.role || 'user'} (Restricted)
+                </span>
+              </div>
+            </div>
+
+            {/* Role Clearance Requirements */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg mb-8 text-left">
+              <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800">
+                <div className="text-xs font-semibold text-emerald-400 flex items-center gap-1.5 mb-1">
+                  <CheckCircle2 size={14} />
+                  <span>Permitted Resources</span>
+                </div>
+                <ul className="text-xs text-slate-400 space-y-1">
+                  <li>• General Vulnerability Dashboards</li>
+                  <li>• High-Level VAPT Summary Reports</li>
+                  <li>• CWE Knowledge Base Remediation</li>
+                </ul>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-red-500/5 border border-red-500/20">
+                <div className="text-xs font-semibold text-red-400 flex items-center gap-1.5 mb-1">
+                  <Lock size={14} />
+                  <span>Restricted to Officers & Analysts</span>
+                </div>
+                <ul className="text-xs text-slate-400 space-y-1">
+                  <li>• Fetching & Inspecting Raw Source Code</li>
+                  <li>• AST Code Structure Extraction</li>
+                  <li>• Downloading Proprietary SAST Reports</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Navigation Actions */}
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full max-w-md">
+              <button
+                onClick={() => navigate('/')}
+                className="w-full py-3 px-5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-semibold text-sm transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <ArrowLeft size={16} />
+                <span>Return to Dashboard</span>
+              </button>
+              <button
+                onClick={() => {
+                  authAPI.logout();
+                  window.location.href = '/login';
+                }}
+                className="w-full py-3 px-5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white font-medium text-sm transition-all cursor-pointer"
+              >
+                Sign In with Officer Account
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative">

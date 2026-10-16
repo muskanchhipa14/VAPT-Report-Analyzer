@@ -12,6 +12,23 @@ router = APIRouter(
 )
 
 
+from app.core.security import get_current_user
+from app.models.user import User
+
+
+@router.get("/me")
+def get_current_user_profile(current_user: User = Depends(get_current_user)):
+    from app.core.roles import get_role_label, has_source_code_access
+    return {
+        "id": current_user.id,
+        "name": current_user.name,
+        "email": current_user.email,
+        "role": current_user.role,
+        "role_label": get_role_label(current_user.role),
+        "can_access_source_code": has_source_code_access(current_user.role)
+    }
+
+
 @router.post("/", response_model=UserResponse)
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
     # Check if email already exists
@@ -27,13 +44,14 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
         db,
         user.name,
         user.email,
-        user.password
+        user.password,
+        role=user.role or "user"
     )
 
     log_event(
         db,
         new_user.name,
-        "Create User",
+        f"Create User ({new_user.role})",
         "User Management",
         "Success"
     )

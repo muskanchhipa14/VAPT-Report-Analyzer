@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, s
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import get_current_user_optional, get_current_user
+from app.core.security import get_current_user_optional, get_current_user, require_source_code_access
 from app.models.user import User
 from app.models.report import Report
 from app.models.vulnerability import Vulnerability
@@ -156,7 +156,7 @@ async def analyze_source_code(
     filename: Optional[str] = Form(None),
     language: Optional[str] = Form(None),
     db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user_optional)
+    current_user: User = Depends(require_source_code_access)
 ):
     """
     Flow 2: Source Code Upload & Analysis
@@ -280,7 +280,7 @@ async def analyze_combined(
     report_file: UploadFile = File(...),
     source_file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user_optional)
+    current_user: User = Depends(require_source_code_access)
 ):
     """
     Flow 3: VAPT Report + Source Code Combined Correlation
