@@ -24,3 +24,5 @@ frontend/build/
 # IDE
 .vscode/
 .idea/
+
+backend/uploads/workspaces/

@@ -5,7 +5,7 @@ import RemediationInspector from './RemediationInspector';
 import {
   Upload, FileText, Trash2, Download, ExternalLink,
   ShieldCheck, AlertTriangle, Loader, CheckCircle, RefreshCw, FolderGit2,
-  Sparkles, Code2, Layers, FileCode, X, Lock, Shield
+  Sparkles, Code2, Layers, FileCode, X, Lock, Shield, RotateCcw
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 
@@ -341,13 +341,23 @@ const Dashboard = ({ user: propUser }) => {
                           <span className="text-slate-500 block truncate max-w-xs">{f.file}:{f.line || 1}</span>
                         </td>
                         <td className="py-3 px-4 text-right">
-                          <button
-                            onClick={() => setInspectingFinding(f)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-500/10 hover:bg-primary-500/20 text-primary-400 hover:text-primary-300 border border-primary-500/20 rounded-xl text-xs font-semibold transition-all"
-                          >
-                            <Sparkles size={13} />
-                            <span>Inspect AI Fix</span>
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => setInspectingFinding(f)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 hover:text-sky-300 border border-sky-500/20 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                              title="Continuous Remediation Loop"
+                            >
+                              <RotateCcw size={13} />
+                              <span>Remediate</span>
+                            </button>
+                            <button
+                              onClick={() => setInspectingFinding(f)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-500/10 hover:bg-primary-500/20 text-primary-400 hover:text-primary-300 border border-primary-500/20 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                            >
+                              <Sparkles size={13} />
+                              <span>AI Fix</span>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

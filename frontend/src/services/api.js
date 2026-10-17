@@ -233,5 +233,44 @@ export const analysisAPI = {
   }
 };
 
+export const remediationAPI = {
+  createJob: async (payload, sync = false) => {
+    const response = await api.post(`/api/remediation/jobs?sync=${sync}`, payload);
+    return response.data;
+  },
+  getJob: async (jobId) => {
+    const response = await api.get(`/api/remediation/jobs/${jobId}`);
+    return response.data;
+  },
+  getJobAttempts: async (jobId) => {
+    const response = await api.get(`/api/remediation/jobs/${jobId}/attempts`);
+    return response.data;
+  },
+  getJobDiff: async (jobId) => {
+    const response = await api.get(`/api/remediation/jobs/${jobId}/diff`);
+    return response.data;
+  },
+  cancelJob: async (jobId) => {
+    const response = await api.post(`/api/remediation/jobs/${jobId}/cancel`);
+    return response.data;
+  },
+  exportPatch: async (jobId, filename) => {
+    const response = await api.post(`/api/remediation/jobs/${jobId}/export`, {}, {
+      responseType: 'blob'
+    });
+    const blob = new Blob([response.data], { type: 'text/x-diff' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename || `remediation_patch_${jobId}.patch`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+    return true;
+  }
+};
+
 export default api;
+
 

@@ -10,6 +10,7 @@ from app.api import audit_log
 from app.api import knowledge_base
 from app.api import source_code
 from app.api import analysis
+from app.api import remediation
 
 from app.core.database import Base, engine, SessionLocal
 from app.core.config import settings
@@ -19,7 +20,7 @@ from app.models.user import User
 from app.models.vulnerability import Vulnerability
 from app.models.audit_log import AuditLog
 from app.models.knowledge_base import KnowledgeBaseItem
-from app.models.source_code import SourceCodeAnalysis, SourceCodeFinding
+from app.models.source_code import SourceCodeAnalysis, SourceCodeFinding, RemediationJob, RemediationAttempt
 
 from app.services.knowledge_base import seed_knowledge_base
 
@@ -45,6 +46,7 @@ app.include_router(audit_log.router)
 app.include_router(knowledge_base.router)
 app.include_router(source_code.router)
 app.include_router(analysis.router)
+app.include_router(remediation.router)
 
 
 def _ensure_sqlite_columns():

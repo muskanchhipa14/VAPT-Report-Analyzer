@@ -150,12 +150,26 @@ Executive PDF Export (ReportLab styled report with code context and suggested fi
 
 ## API Endpoints Reference
 
+### Continuous Vulnerability Remediation Endpoints (New)
+* `POST /api/remediation/jobs`: Create and enqueue an automated continuous remediation loop job (accepts finding, code snippet, cwe_id, max_attempts).
+* `GET /api/remediation/jobs/{job_id}`: Retrieve real-time job status, state machine progress, attempt count, and verification evidence.
+* `GET /api/remediation/jobs/{job_id}/attempts`: Retrieve chronological attempt history, including patch diffs, syntax errors, and validation logs.
+* `GET /api/remediation/jobs/{job_id}/diff`: Inspect unified diff (`.patch` format) of the independently verified fix.
+* `POST /api/remediation/jobs/{job_id}/cancel`: Gracefully cancel an active remediation job and restore workspace files to original state.
+* `POST /api/remediation/jobs/{job_id}/export`: Download the verified patch file after remediation is confirmed resolved.
+
 ### Source Code Scanner Endpoints
 * `POST /source-code/analyze`: Upload project ZIP archive for static analysis. Returns files scanned, lines scanned, severity summary, and findings.
 * `GET /source-code/analyses`: List all source code analyses conducted by the authenticated user.
 * `GET /source-code/analyses/{id}`: Retrieve detailed analysis record including findings, code snippets, and suggested fixes.
 * `DELETE /source-code/analyses/{id}`: Delete analysis record and associated findings.
 * `GET /source-code/analyses/{id}/download`: Download executive SAST PDF report.
+
+### Multi-Flow Analysis & Remediation Endpoints
+* `POST /api/analyze/report`: Upload and parse VAPT scan report (`.pdf`, `.docx`, `.txt`, `.png`, `.jpg`).
+* `POST /api/analyze/source-code`: Upload source archive or raw code snippet for instant static analysis.
+* `POST /api/analyze/combined`: Correlate pentest report findings against real project source code to verify flaws vs false positives.
+* `POST /api/remediation/generate`: On-demand AI/semantic remediation synthesis for any CWE and code context.
 
 ### Existing VAPT Report Endpoints (Preserved)
 * `POST /reports/upload`: Upload and parse VAPT scan report (`.pdf` / `.docx`).
@@ -171,6 +185,7 @@ Executive PDF Export (ReportLab styled report with code context and suggested fi
 * `GET /knowledge-base/`: Retrieve all Knowledge Base vulnerability definitions.
 * `GET /knowledge-base/{cwe_id}`: Retrieve Knowledge Base details for a specific CWE.
 * `GET /logs/`: View security audit trail logs.
+
 
 ---
 

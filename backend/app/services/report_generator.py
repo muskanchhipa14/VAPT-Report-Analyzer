@@ -745,7 +745,61 @@ def generate_source_code_pdf_report(analysis_meta: dict, findings: list, db: Ses
         finding_elements.append(Spacer(1, 18))
         story.append(KeepTogether(finding_elements))
 
+    # Optional Section: Continuous Remediation Outcomes
+    analysis_id = analysis_meta.get("id")
+    if db and analysis_id:
+        try:
+            from app.models.source_code import RemediationJob
+            jobs = db.query(RemediationJob).filter(RemediationJob.analysis_id == analysis_id).all()
+            if jobs:
+                story.append(PageBreak())
+                story.append(Paragraph("Continuous Automated Remediation Outcomes", h1_style))
+                story.append(Paragraph(
+                    "The following findings underwent automated continuous remediation cycles, including patch synthesis, "
+                    "isolated workspace application, syntax compilation, and independent SAST verification.",
+                    body_style
+                ))
+                story.append(Spacer(1, 12))
+
+                rem_table_data = [
+                    [
+                        Paragraph("<b>Finding / CWE</b>", table_header_style),
+                        Paragraph("<b>Target File</b>", table_header_style),
+                        Paragraph("<b>Attempts</b>", table_header_style),
+                        Paragraph("<b>Final State</b>", table_header_style),
+                    ]
+                ]
+
+                for j in jobs:
+                    state_color = "#16a34a" if j.state == "VERIFIED_FIXED" else ("#d97706" if j.state == "NEEDS_MANUAL_REVIEW" else "#dc2626")
+                    rem_table_data.append([
+                        Paragraph(f"<b>{j.cwe_id}</b><br/><font size=7 color='#475569'>{j.vulnerability_name}</font>", body_style),
+                        Paragraph(f"<font size=7>{os.path.basename(j.file_path or 'N/A')}</font>", body_style),
+                        Paragraph(f"{j.current_attempt} / {j.max_attempts}", body_style),
+                        Paragraph(f"<b><font color='{state_color}'>{j.state.replace('_', ' ')}</font></b>", body_style),
+                    ])
+
+                rem_table = Table(rem_table_data, colWidths=[160, 160, 64, 120])
+                rem_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#0f172a")),
+                    ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+                    ('TOPPADDING', (0,0), (-1,-1), 6),
+                    ('LEFTPADDING', (0,0), (-1,-1), 8),
+                    ('RIGHTPADDING', (0,0), (-1,-1), 8),
+                    ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#cbd5e1")),
+                    ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                ]))
+                story.append(rem_table)
+                story.append(Spacer(1, 12))
+                story.append(Paragraph(
+                    "<font size=7 color='#64748b'><i>Disclaimer: Verified fixes reflect successful compilation and zero automated SAST detections in isolated rescanning. Unverified or manual review items must be evaluated by application security engineers prior to production merging.</i></font>",
+                    body_style
+                ))
+        except Exception as e:
+            print(f"Notice: Could not append remediation jobs to PDF report: {e}")
+
     doc.build(story, canvasmaker=NumberedCanvas)
     buffer.seek(0)
     return buffer
+
 

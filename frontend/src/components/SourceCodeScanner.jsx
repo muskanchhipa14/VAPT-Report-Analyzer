@@ -7,7 +7,7 @@ import {
   Trash2, Download, Search, Sparkles, Layers,
   Code2, RefreshCw, AlertTriangle,
   FolderGit2, Terminal, Info, X, ChevronRight, Copy, Check, Database,
-  Shield, Lock, ArrowLeft
+  Shield, Lock, ArrowLeft, RotateCcw
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 
@@ -711,7 +711,18 @@ const SourceCodeScanner = ({ user: propUser }) => {
                                 e.stopPropagation();
                                 setInspectingFinding(f);
                               }}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary-500/10 hover:bg-primary-500/20 text-primary-400 border border-primary-500/20 rounded-lg text-xs font-semibold transition-all"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/20 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+                              title="Start Continuous Remediation Loop"
+                            >
+                              <RotateCcw size={13} />
+                              <span>Remediate</span>
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setInspectingFinding(f);
+                              }}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary-500/10 hover:bg-primary-500/20 text-primary-400 border border-primary-500/20 rounded-lg text-xs font-semibold transition-all cursor-pointer"
                               title="Open Full AI Remediation Inspector"
                             >
                               <Sparkles size={13} />

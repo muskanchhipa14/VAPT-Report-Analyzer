@@ -19,26 +19,54 @@ import urllib.error
 from typing import Optional, Dict, Any, List
 from app.source_scanner.rules import get_suggested_fix
 
+import difflib
+
 # Centralized System Prompt
 AI_SYSTEM_PROMPT = """You are a secure software remediation assistant.
 
-Analyze the identified vulnerability using the supplied vulnerability information, knowledge-base context, programming language, framework, and vulnerable code.
+Analyze the identified vulnerability using the supplied vulnerability information, knowledge-base context, programming language, framework, vulnerable code, previous attempts, and validation errors.
 
 Generate a remediation that is technically appropriate for the detected language and framework.
 
-Do not provide generic remediation when language-specific remediation is possible.
-
-Explain:
-1. What is vulnerable
-2. Why it is vulnerable
-3. How to fix it
-4. Language/framework-specific implementation
-5. Secure replacement code where possible
-6. How to verify the fix
-
-Do not modify unrelated application behavior.
+CRITICAL RULES:
+1. Do not provide generic remediation when language-specific remediation is possible.
+2. Never suppress or disable security rules (e.g. no '# noqa', '/* eslint-disable */', '@SuppressWarnings').
+3. Never delete functionality, business logic, or authentication checks merely to eliminate a warning.
+4. If a previous attempt produced syntax errors or failed tests, fix the error without re-introducing the vulnerability.
+5. Explain:
+   1. What is vulnerable
+   2. Why it is vulnerable
+   3. How to fix it
+   4. Language/framework-specific implementation
+   5. Secure replacement code
+   6. How to verify the fix
+   7. Assumptions made
+   8. Potential regressions or side effects
 
 If the provided information is insufficient to safely generate a precise code fix, explicitly state what information is missing instead of inventing implementation details."""
+
+
+def compute_patch_diff(vulnerable_code: str, secure_code: str, filename: str = "source_file") -> str:
+    """Generates a standard unified diff between vulnerable code and secure replacement code."""
+    v_clean = (vulnerable_code or "").strip()
+    s_clean = (secure_code or "").strip()
+    if not v_clean and not s_clean:
+        return ""
+    if v_clean == s_clean:
+        return ""
+    v_lines = v_clean.splitlines(keepends=True)
+    s_lines = s_clean.splitlines(keepends=True)
+    # Ensure newline at end for clean diff display
+    if v_lines and not v_lines[-1].endswith("\n"):
+        v_lines[-1] += "\n"
+    if s_lines and not s_lines[-1].endswith("\n"):
+        s_lines[-1] += "\n"
+    diff = list(difflib.unified_diff(
+        v_lines, s_lines,
+        fromfile=f"a/{filename}",
+        tofile=f"b/{filename}"
+    ))
+    return "".join(diff) if diff else ""
 
 
 def build_ai_prompt(
@@ -53,8 +81,12 @@ def build_ai_prompt(
     vulnerable_code: Optional[str] = None,
     description: Optional[str] = None,
     kb_remediation: Optional[str] = None,
+    previous_attempts: Optional[List[Dict[str, Any]]] = None,
+    patch_diff: Optional[str] = None,
+    validation_errors: Optional[str] = None,
+    latest_findings: Optional[List[str]] = None,
 ) -> str:
-    """Builds structured prompt payload for LLM analysis."""
+    """Builds structured prompt payload for LLM analysis with multi-attempt feedback context."""
     context_lines = [
         f"Vulnerability Name: {vulnerability}",
         f"CWE ID: {cwe_id}",
@@ -71,6 +103,36 @@ def build_ai_prompt(
         "```",
         vulnerable_code or "# No vulnerable code snippet available.",
         "```",
+    ]
+
+    if previous_attempts:
+        context_lines.extend([
+            "",
+            f"Previous Remediation Attempts ({len(previous_attempts)} prior attempt(s)):",
+        ])
+        for idx, att in enumerate(previous_attempts, 1):
+            att_diff = att.get("patch_diff") or ""
+            att_err = att.get("syntax_errors") or att.get("status_message") or "N/A"
+            context_lines.append(f"- Attempt #{idx}: Status={att.get('state', 'Unknown')}, Error={att_err}")
+            if att_diff:
+                context_lines.append(f"  Attempt Diff:\n{att_diff[:300]}")
+
+    if validation_errors:
+        context_lines.extend([
+            "",
+            "Latest Validation / Syntax Errors from Previous Attempt:",
+            f"{validation_errors}",
+            "Fix this specific error in your new proposal!",
+        ])
+
+    if latest_findings:
+        context_lines.extend([
+            "",
+            "Remaining or Newly Detected Findings from Previous Rescan:",
+            "\n".join(f"- {f}" for f in latest_findings),
+        ])
+
+    context_lines.extend([
         "",
         "Please respond strictly in valid JSON matching this schema:",
         "{",
@@ -87,10 +149,14 @@ def build_ai_prompt(
         '  "ai_remediation": "string",',
         '  "secure_code": "string",',
         '  "implementation_steps": ["step 1", "step 2"],',
-        '  "verification_steps": ["verification 1", "verification 2"]',
+        '  "verification_steps": ["verification 1", "verification 2"],',
+        '  "patch_diff": "string (unified diff format)",',
+        '  "assumptions": "string",',
+        '  "potential_regressions": "string"',
         "}"
-    ]
+    ])
     return "\n".join(context_lines)
+
 
 
 def generate_semantic_remediation(
@@ -771,7 +837,10 @@ def generate_semantic_remediation(
         "ai_remediation": ai_remediation,
         "secure_code": secure_code,
         "implementation_steps": implementation_steps,
-        "verification_steps": verification_steps
+        "verification_steps": verification_steps,
+        "patch_diff": compute_patch_diff(clean_code, secure_code, fname),
+        "assumptions": f"Assumes {lang or 'application'} runtime supports standard safe APIs and caller passes expected types.",
+        "potential_regressions": "Callers relying on implicit type coercion or unvalidated input structures may need parameter adjustments."
     }
 
 
@@ -787,6 +856,9 @@ def call_external_llm_remediation(
     vulnerable_code: Optional[str] = None,
     description: Optional[str] = None,
     kb_remediation: Optional[str] = None,
+    previous_attempts: Optional[List[Dict[str, Any]]] = None,
+    validation_errors: Optional[str] = None,
+    latest_findings: Optional[List[str]] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Attempts to call an external LLM (Gemini, Groq, or OpenAI) if an API key is configured.
@@ -803,7 +875,10 @@ def call_external_llm_remediation(
         line_number=line_number,
         vulnerable_code=vulnerable_code,
         description=description,
-        kb_remediation=kb_remediation
+        kb_remediation=kb_remediation,
+        previous_attempts=previous_attempts,
+        validation_errors=validation_errors,
+        latest_findings=latest_findings,
     )
 
     gemini_key = os.getenv("GEMINI_API_KEY", "")
@@ -910,6 +985,9 @@ def generate_remediation(
     vulnerable_code: Optional[str] = None,
     description: Optional[str] = None,
     kb_remediation: Optional[str] = None,
+    previous_attempts: Optional[List[Dict[str, Any]]] = None,
+    validation_errors: Optional[str] = None,
+    latest_findings: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """
     Main entry point for generating language-specific vulnerability remediation.
@@ -930,7 +1008,10 @@ def generate_remediation(
         line_number=line_number,
         vulnerable_code=vulnerable_code,
         description=description,
-        kb_remediation=kb_remediation
+        kb_remediation=kb_remediation,
+        previous_attempts=previous_attempts,
+        validation_errors=validation_errors,
+        latest_findings=latest_findings,
     )
 
     if llm_result and isinstance(llm_result, dict) and "why_vulnerable" in llm_result:
@@ -944,10 +1025,18 @@ def generate_remediation(
         llm_result.setdefault("line", line_number or 1)
         llm_result.setdefault("description", description or f"Vulnerability {vulnerability}")
         llm_result.setdefault("knowledge_base_remediation", kb_remediation or "Apply least privilege")
+        if not llm_result.get("patch_diff"):
+            llm_result["patch_diff"] = compute_patch_diff(
+                vulnerable_code or "",
+                llm_result.get("secure_code", ""),
+                file_name or "source_file"
+            )
+        llm_result.setdefault("assumptions", f"Assumes {lang} runtime with verified input parameters.")
+        llm_result.setdefault("potential_regressions", "Callers should verify parameter contracts.")
         return llm_result
 
     # High-fidelity semantic generator fallback
-    return generate_semantic_remediation(
+    sem_result = generate_semantic_remediation(
         vulnerability=vulnerability,
         cwe_id=cwe_id,
         severity=severity,
@@ -960,3 +1049,11 @@ def generate_remediation(
         description=description,
         kb_remediation=kb_remediation
     )
+    if not sem_result.get("patch_diff"):
+        sem_result["patch_diff"] = compute_patch_diff(
+            vulnerable_code or "",
+            sem_result.get("secure_code", ""),
+            file_name or "source_file"
+        )
+    return sem_result
+
